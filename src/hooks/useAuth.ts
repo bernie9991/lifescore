@@ -142,7 +142,7 @@ export const useAuthProvider = () => {
   const clearError = () => setLastError(null);
 
   // Enhanced error handler
-  const handleAuthError = useCallback (error: any, operation: string): AuthError => {
+  const handleAuthError = useCallback ( (error: any, operation: string): AuthError => {
     authLogger.error(`${operation} failed`, error);
     
     let authError: AuthError;
