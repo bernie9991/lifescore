@@ -1,6 +1,5 @@
 import { Badge, User, UserBadge } from '../types';
-import { calculateLifeScore, getScoreLevel } from './lifeScoreEngine';
-import { getGlobalRank, getCountryRank } from './mockData';
+import { calculateLifeScore, getScoreLevel, estimateGlobalStanding } from './lifeScoreEngine';
 
 // Complete Badge Database - 50+ Badges
 export const ALL_BADGES: Badge[] = [
@@ -527,6 +526,39 @@ export const ALL_BADGES: Badge[] = [
   }
 ];
 
+// Helper function to calculate global rank
+function getGlobalRank(lifeScore: number): number {
+  // Use the same calculation as in the modal components
+  const globalStanding = estimateGlobalStanding(lifeScore, {} as User);
+  return 8000000000 - globalStanding.peopleAhead;
+}
+
+// Helper function to calculate country rank
+function getCountryRank(lifeScore: number, country: string): number {
+  // Country populations for rank calculation
+  const countryPopulations: Record<string, number> = {
+    'United States': 331000000,
+    'China': 1440000000,
+    'India': 1380000000,
+    'Brazil': 215000000,
+    'United Kingdom': 67000000,
+    'Germany': 83000000,
+    'France': 68000000,
+    'Canada': 38000000,
+    'Australia': 26000000,
+    'Singapore': 6000000,
+    'Spain': 47000000,
+    'Italy': 60000000,
+    'Japan': 125000000,
+    'South Korea': 52000000,
+    'Georgia': 4000000
+  };
+  
+  const globalStanding = estimateGlobalStanding(lifeScore, {} as User);
+  const countryPopulation = countryPopulations[country] || 50000000;
+  return Math.floor(countryPopulation * (1 - globalStanding.percentile / 100));
+}
+
 // Badge checking functions
 export function checkBadgeUnlocks(user: User, previousUser?: User): Badge[] {
   const newlyUnlockedBadges: Badge[] = [];
@@ -573,8 +605,8 @@ export function checkBadgeUnlocks(user: User, previousUser?: User): Badge[] {
 
 function shouldUnlockBadge(badge: Badge, user: User, previousUser?: User): boolean {
   const scoreBreakdown = calculateLifeScore(user);
-  const globalRank = getGlobalRank(user.lifeScore);
-  const countryRank = getCountryRank(user.lifeScore, user.country);
+  const globalRank = getGlobalRank(user.lifeScore || 0);
+  const countryRank = getCountryRank(user.lifeScore || 0, user.country);
   
   // For specific badges, add detailed logging
   if (badge.id === 'wealth-apprentice') {
@@ -590,7 +622,7 @@ function shouldUnlockBadge(badge: Badge, user: User, previousUser?: User): boole
   switch (badge.id) {
     // Progress badges
     case 'welcome-aboard':
-      return user.lifeScore > 0;
+      return (user.lifeScore || 0) > 0;
     
     case 'profile-complete':
       return !!(user.name && user.city && user.country);
@@ -603,10 +635,10 @@ function shouldUnlockBadge(badge: Badge, user: User, previousUser?: User): boole
       );
     
     case 'xp-master':
-      return user.lifeScore >= 10000;
+      return (user.lifeScore || 0) >= 10000;
     
     case 'score-climber':
-      return previousUser && (user.lifeScore - (previousUser.lifeScore || 0)) >= 2000;
+      return previousUser && ((user.lifeScore || 0) - (previousUser.lifeScore || 0)) >= 2000;
 
     // Wealth badges
     case 'wealth-apprentice':
@@ -720,10 +752,10 @@ function shouldUnlockBadge(badge: Badge, user: User, previousUser?: User): boole
 
     // Legendary badges
     case 'lifescore-legend':
-      return user.lifeScore >= 25000;
+      return (user.lifeScore || 0) >= 25000;
     
     case 'perfect-score':
-      return user.lifeScore >= 30000;
+      return (user.lifeScore || 0) >= 30000;
     
     case 'renaissance-person':
       return scoreBreakdown.wealthScore >= 15000 && 
@@ -803,7 +835,7 @@ export function getDefaultBadgesForNewUser(user: User): Badge[] {
 
 export function getBadgeProgress(badge: Badge, user: User): { current: number; total: number; percentage: number } {
   const scoreBreakdown = calculateLifeScore(user);
-  const globalRank = getGlobalRank(user.lifeScore);
+  const globalRank = getGlobalRank(user.lifeScore || 0);
   
   switch (badge.id) {
     case 'wealth-apprentice':
