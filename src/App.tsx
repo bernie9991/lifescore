@@ -4,15 +4,34 @@ import { Toaster } from 'react-hot-toast';
 import { AuthContext, useAuthProvider } from './hooks/useAuth';
 import HomePage from './pages/HomePage';
 import OnboardingFlow from './components/onboarding/OnboardingFlow';
-import Dashboard from './components/dashboard/Dashboard';
-import AdminPanel from './components/admin/AdminPanel';
+import MainApp from './components/MainApp';
 import BadgeUnlockModal from './components/badges/BadgeUnlockModal';
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated, isAdmin, newlyUnlockedBadges, clearNewBadges, user } = useAuthProvider();
+  const { 
+    isAuthenticated, 
+    isAdmin, 
+    authInitialized, 
+    newlyUnlockedBadges, 
+    clearNewBadges, 
+    user 
+  } = useAuthProvider();
+
+  // Show loading screen while auth is initializing
+  if (!authInitialized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" />
+          <div className="text-white text-xl font-semibold mb-2">Initializing LifeScore...</div>
+          <div className="text-gray-300">Setting up your experience</div>
+        </div>
+      </div>
+    );
+  }
 
   // Check if user needs onboarding (incomplete profile)
-  const needsOnboarding = user && (
+  const needsOnboarding = user && isAuthenticated && !isAdmin && (
     !user.name || 
     !user.country || 
     !user.city || 
@@ -25,16 +44,14 @@ const AppContent: React.FC = () => {
         <Route 
           path="/" 
           element={
-            isAuthenticated ? (
-              isAdmin ? (
-                <Navigate to="/admin" replace />
-              ) : needsOnboarding ? (
-                <Navigate to="/onboarding" replace />
-              ) : (
-                <Navigate to="/dashboard" replace />
-              )
-            ) : (
+            !isAuthenticated ? (
               <HomePage />
+            ) : isAdmin ? (
+              <Navigate to="/app" replace />
+            ) : needsOnboarding ? (
+              <Navigate to="/onboarding" replace />
+            ) : (
+              <Navigate to="/app" replace />
             )
           } 
         />
@@ -45,9 +62,9 @@ const AppContent: React.FC = () => {
             isAuthenticated && !isAdmin && needsOnboarding ? (
               <OnboardingFlow />
             ) : isAuthenticated && isAdmin ? (
-              <Navigate to="/admin" replace />
+              <Navigate to="/app" replace />
             ) : isAuthenticated ? (
-              <Navigate to="/dashboard" replace />
+              <Navigate to="/app" replace />
             ) : (
               <Navigate to="/" replace />
             )
@@ -55,31 +72,12 @@ const AppContent: React.FC = () => {
         />
         
         <Route 
-          path="/dashboard" 
+          path="/app/*" 
           element={
-            isAuthenticated && !isAdmin && !needsOnboarding ? (
-              <Dashboard />
-            ) : isAuthenticated && isAdmin ? (
-              <Navigate to="/admin" replace />
+            isAuthenticated && !needsOnboarding ? (
+              <MainApp />
             ) : isAuthenticated && needsOnboarding ? (
               <Navigate to="/onboarding" replace />
-            ) : (
-              <Navigate to="/" replace />
-            )
-          } 
-        />
-
-        <Route 
-          path="/admin" 
-          element={
-            isAdmin ? (
-              <AdminPanel />
-            ) : isAuthenticated ? (
-              needsOnboarding ? (
-                <Navigate to="/onboarding" replace />
-              ) : (
-                <Navigate to="/dashboard" replace />
-              )
             ) : (
               <Navigate to="/" replace />
             )
