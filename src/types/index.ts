@@ -18,6 +18,7 @@ export interface User {
   lastActive: Date;
   scoreBreakdown?: any;
   wantsIntegrations?: boolean;
+  role: string;
 }
 
 export interface WealthData {
