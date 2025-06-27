@@ -395,7 +395,7 @@ export const useAuthProvider = () => {
   };
 
   // Enhanced user data loading with better error handling
-  const loadUserData = async (supabaseUser: SupabaseUser): Promise<User | null> => {
+  const loadUserData = useCallback(async (supabaseUser: SupabaseUser): Promise<User | null> => {
     try {
       authLogger.info('Loading user data', { userId: supabaseUser.id });
       
@@ -559,7 +559,7 @@ export const useAuthProvider = () => {
       authLogger.error('Error loading user data', error);
       return null;
     }
-  };
+  },[handleAuthError]);
 
   // Enhanced user data saving with better error handling
   const saveUserData = async (userData: User) => {
@@ -735,7 +735,7 @@ export const useAuthProvider = () => {
     }
   };
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       setLoading(true);
       authLogger.info('Logging out user');
@@ -775,7 +775,7 @@ export const useAuthProvider = () => {
     } finally {
       setLoading(false);
     }
-  };
+  },[handleAuthError]);
 
   // Initialize auth with enhanced error handling
   useEffect(() => {
@@ -879,7 +879,7 @@ export const useAuthProvider = () => {
     };
   }, []);
 
-  const login = async (email: string, password: string): Promise<void> => {
+  const login = useCallback(async (email: string, password: string): Promise<void> => {
     try {
       setLoading(true);
       clearError();
@@ -936,9 +936,9 @@ export const useAuthProvider = () => {
       setLoading(false);
       throw authError;
     }
-  };
+  },[handleAuthError]);
 
-  const signup = async (email: string, password: string, name: string): Promise<void> => {
+  const signup = useCallback(async (email: string, password: string, name: string): Promise<void> => {
     try {
       setLoading(true);
       clearError();
@@ -1023,9 +1023,9 @@ export const useAuthProvider = () => {
       setLoading(false);
       throw authError;
     }
-  };
+  },[handleAuthError]);
 
-  const updateUser = async (userData: Partial<User>) => {
+  const updateUser = useCallback(async (userData: Partial<User>) => {
     if (!user) {
       authLogger.error('No user to update');
       return;
@@ -1077,7 +1077,7 @@ export const useAuthProvider = () => {
       handleAuthError(error, 'User update');
       toast.error('Failed to update profile');
     }
-  };
+  },[handleAuthError, user]);
 
   const clearNewBadges = () => {
     authLogger.debug('Clearing newly unlocked badges');
