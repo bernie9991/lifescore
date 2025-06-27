@@ -59,14 +59,24 @@ interface AuthContextType {
     clearError: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+    user: null,
+    isAuthenticated: false,
+    isAdmin: false,
+    login: async () => false,
+    signup: async () => false,
+    logout: async () => {},
+    updateUser: async () => {},
+    newlyUnlockedBadges: [],
+    clearNewBadges: () => {},
+    loading: true,
+    lastError: null,
+    clearError: () => {},
+});
+
 
 export const useAuth = () => {
-    const context = useContext(AuthContext);
-    if (context === undefined) {
-        throw new Error('useAuth must be used within an AuthProvider');
-    }
-    return context;
+    return useContext(AuthContext);
 };
 
 // --- Utilities ---
@@ -158,8 +168,8 @@ export const useAuthProvider = () => {
                 country: profile.country || '',
                 city: profile.city || '',
                 lifeScore: profile.life_score || 0,
-                wealth: wealthResult.data ? { ...wealthResult.data, total: wealthResult.data.salary + wealthResult.data.savings + wealthResult.data.investments } : { salary: 0, savings: 0, investments: 0, currency: 'USD', total: 0 },
-                knowledge: knowledgeResult.data ? { ...knowledgeResult.data, total: knowledgeResult.data.total_score } : { education: '', certificates: [], languages: [], total: 0 },
+                wealth: wealthResult.data || { salary: 0, savings: 0, investments: 0, currency: 'USD', total: 0 },
+                knowledge: knowledgeResult.data || { education: '', certificates: [], languages: [], total: 0 },
                 assets: assetsResult.data || [],
                 badges: (badgesResult.data || []).map(ub => {
                     const badge = ALL_BADGES.find(b => b.id === ub.badge_id);
@@ -200,16 +210,6 @@ export const useAuthProvider = () => {
         setLoading(true);
         clearError();
         authLogger.info('Attempting login', { email });
-
-        if (email === 'admin' && password === 'admin123') {
-            authLogger.info('Admin login detected');
-            const adminUser: User = { id: 'admin-user-id', name: 'Admin', email: 'admin@lifescore.com', lifeScore: 1000, role: 'admin' } as User;
-            setUser(adminUser);
-            setIsAdmin(true);
-            setIsAuthenticated(true);
-            setLoading(false);
-            return true;
-        }
         
         try {
             if (!validateEmail(email) || !validatePassword(password).isValid) {
@@ -269,22 +269,18 @@ export const useAuthProvider = () => {
         if (error) {
             handleAuthError(error, 'Logout');
         }
-        setUser(null);
-        setIsAuthenticated(false);
-        setIsAdmin(false);
-        setNewlyUnlockedBadges([]);
-        setLoading(false);
     }, [handleAuthError]);
     
     const saveUserData = useCallback(async (updatedUser: User) => {
         authLogger.info('Saving user data', { userName: updatedUser.name });
         const { id, name, avatar, age, gender, country, city, lifeScore, avatarBadge, wantsIntegrations, wealth, knowledge, assets } = updatedUser;
         const profilePromise = supabase.from(CONSTANTS.TABLES.PROFILES).update({ name, avatar_url: avatar, age, gender, country, city, life_score: lifeScore, avatar_badge_id: avatarBadge?.id || null, wants_integrations: wantsIntegrations }).eq('id', id);
-        const wealthPromise = supabase.from(CONSTANTS.TABLES.WEALTH_DATA).update({ salary: wealth.salary, savings: wealth.savings, investments: wealth.investments, currency: wealth.currency }).eq('user_id', id);
-        const knowledgePromise = supabase.from(CONSTANTS.TABLES.KNOWLEDGE_DATA).update({ education: knowledge.education, certificates: knowledge.certificates, languages: knowledge.languages }).eq('user_id', id);
+        const wealthPromise = supabase.from(CONSTANTS.TABLES.WEALTH_DATA).update({ salary: wealth.salary, savings: wealth.savings, investments: wealth.investments, currency: wealth.currency, total: wealth.total }).eq('user_id', id);
+        const knowledgePromise = supabase.from(CONSTANTS.TABLES.KNOWLEDGE_DATA).update({ education: knowledge.education, certificates: knowledge.certificates, languages: knowledge.languages, total_score: knowledge.total }).eq('user_id', id);
         
         const currentAssets = user?.assets || [];
         const newAssets = assets || [];
+    
         const assetsToInsert = newAssets.filter(na => !currentAssets.some(ca => ca.id === na.id));
         const assetsToUpdate = newAssets.filter(na => {
             const current = currentAssets.find(ca => ca.id === na.id);
@@ -306,6 +302,7 @@ export const useAuthProvider = () => {
 
     const updateUser = useCallback(async (userData: Partial<User>) => {
         if (!user) return;
+        setLoading(true);
         const previousUser = JSON.parse(JSON.stringify(user));
         const updatedUserDraft = { ...user, ...userData };
         const userWithScore = updateUserLifeScore(updatedUserDraft);
@@ -314,7 +311,7 @@ export const useAuthProvider = () => {
         if (newBadges.length > 0) {
             userWithScore.badges = [...(userWithScore.badges || []), ...newBadges];
         }
-        setLoading(true);
+        
         try {
             await saveUserData(userWithScore);
             setUser(userWithScore);
@@ -326,6 +323,8 @@ export const useAuthProvider = () => {
         } catch (error) {
             handleAuthError(error, 'User Update');
             toast.error('Failed to update profile.');
+            // Revert to previous state on failure
+            setUser(previousUser);
         } finally {
             setLoading(false);
         }
@@ -350,37 +349,49 @@ export const useAuthProvider = () => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             authLogger.info('Auth state changed', { event });
             setLoading(true);
-            if (session?.user) {
-                const isNewUser = event === 'SIGNED_IN' && signupDetails.current.name;
-                if (isNewUser) {
-                    await initializeNewUserData(session.user.id, signupDetails.current.name as string);
-                    signupDetails.current = {};
-                }
-                const userData = await loadUserData(session.user);
-                if (userData) {
-                    setUser(userData);
-                    setIsAuthenticated(true);
-                    setIsAdmin(userData.role === 'admin');
-                    if(isNewUser) {
-                        const defaultBadges = getDefaultBadgesForNewUser(userData);
-                        setNewlyUnlockedBadges(defaultBadges);
+
+            switch (event) {
+                case 'SIGNED_IN':
+                    if (session?.user) {
+                        const isNewUser = signupDetails.current.name;
+                        if (isNewUser) {
+                            await initializeNewUserData(session.user.id, signupDetails.current.name as string);
+                            signupDetails.current = {};
+                        }
+                        const userData = await loadUserData(session.user);
+                        if (userData) {
+                            setUser(userData);
+                            setIsAuthenticated(true);
+                            setIsAdmin(userData.role === 'admin');
+                            if(isNewUser) {
+                                const defaultBadges = getDefaultBadgesForNewUser(userData);
+                                setNewlyUnlockedBadges(defaultBadges);
+                            }
+                        }
                     }
-                } else {
+                    break;
+                case 'SIGNED_OUT':
+                case 'USER_DELETED':
                     setUser(null);
                     setIsAuthenticated(false);
                     setIsAdmin(false);
-                }
-            } else {
-                setUser(null);
-                setIsAuthenticated(false);
-                setIsAdmin(false);
-                setNewlyUnlockedBadges([]);
+                    setNewlyUnlockedBadges([]);
+                    break;
+                case 'USER_UPDATED':
+                     if (session?.user) {
+                        const userData = await loadUserData(session.user);
+                        if (userData) {
+                            setUser(userData);
+                        }
+                    }
+                    break;
             }
+            
             setLoading(false);
         });
 
         return () => subscription.unsubscribe();
-    }, [loadUserData, initializeNewUserData]);
+    }, [loadUserData, initializeNewUserData, handleAuthError]);
 
     return {
         user,
