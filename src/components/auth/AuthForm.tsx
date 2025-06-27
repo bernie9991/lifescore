@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Mail, Lock, User, Sparkles, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Sparkles, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import Button from '../common/Button';
 import toast from 'react-hot-toast';
@@ -26,7 +26,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { login, signup, loading, error, clearError } = useAuth();
+  const { login, signup, loading, lastError, clearError } = useAuth();
 
   const loginForm = useForm<LoginFormData>();
   const signupForm = useForm<SignupFormData>();
@@ -39,7 +39,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
       onSuccess?.();
     } catch (error: any) {
       console.error('Login error:', error);
-      // Error is already handled by useAuth
+      // Error is already handled by useAuth and displayed via lastError
+      if (!lastError) {
+        toast.error(error.message || 'Login failed. Please try again.');
+      }
     }
   };
 
@@ -56,7 +59,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
       onSuccess?.();
     } catch (error: any) {
       console.error('Signup error:', error);
-      // Error is already handled by useAuth
+      // Error is already handled by useAuth and displayed via lastError
+      if (!lastError) {
+        toast.error(error.message || 'Signup failed. Please try again.');
+      }
     }
   };
 
@@ -99,7 +105,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
         </div>
 
         {/* Error Display */}
-        {error && (
+        {lastError && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -108,9 +114,20 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
             <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-red-300 text-sm font-medium">
-                {error}
+                {lastError.message}
               </p>
+              {lastError.type === 'TIMEOUT_ERROR' && (
+                <p className="text-red-400 text-xs mt-1">
+                  Check your internet connection and try again.
+                </p>
+              )}
             </div>
+            <button
+              onClick={clearError}
+              className="text-red-400 hover:text-red-300 ml-auto"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </motion.div>
         )}
 
@@ -215,6 +232,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
                     minLength: {
                       value: 2,
                       message: 'Name must be at least 2 characters'
+                    },
+                    maxLength: {
+                      value: 100,
+                      message: 'Name must be less than 100 characters'
                     }
                   })}
                   type="text"
@@ -271,6 +292,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
                     minLength: {
                       value: 6,
                       message: 'Password must be at least 6 characters'
+                    },
+                    maxLength: {
+                      value: 128,
+                      message: 'Password must be less than 128 characters'
                     }
                   })}
                   type={showPassword ? 'text' : 'password'}
@@ -357,6 +382,14 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
             </button>
           </p>
         </div>
+
+        {/* Connection Status */}
+        {loading && (
+          <div className="mt-4 flex items-center justify-center space-x-2 text-sm text-gray-400">
+            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+            <span>Connecting securely...</span>
+          </div>
+        )}
       </div>
     </motion.div>
   );

@@ -1,22 +1,25 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
-import { ALL_BADGES } from '../../utils/badgeSystem';
-import { triggerConfetti } from '../../utils/animations';
 import WelcomeStep from './WelcomeStep';
-import QuickQuestionsStep from './QuickQuestionsStep';
-import BadgeUnlockModal from '../badges/BadgeUnlockModal';
+import BasicInfoStep from './BasicInfoStep';
+import WealthStep from './WealthStep';
+import AssetsStep from './AssetsStep';
+import KnowledgeStep from './KnowledgeStep';
+import ResultsStep from './ResultsStep';
 
 const OnboardingFlow: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState({});
-  const [showBadges, setShowBadges] = useState(false);
-  const [badgesToShow, setBadgesToShow] = useState<any[]>([]);
   const { updateUser } = useAuth();
 
   const steps = [
     WelcomeStep,
-    QuickQuestionsStep
+    BasicInfoStep,
+    WealthStep,
+    AssetsStep,
+    KnowledgeStep,
+    ResultsStep
   ];
 
   const nextStep = (data?: any) => {
@@ -28,7 +31,8 @@ const OnboardingFlow: React.FC = () => {
       setCurrentStep(currentStep + 1);
     } else {
       // Complete onboarding
-      completeOnboarding();
+      updateUser(formData);
+      localStorage.setItem('lifescore_onboarding_complete', 'true');
     }
   };
 
@@ -38,93 +42,7 @@ const OnboardingFlow: React.FC = () => {
     }
   };
 
-  const completeOnboarding = async () => {
-    try {
-      // Calculate LifeScore based on answers
-      let lifeScore = 1000; // Base score
-      
-      // Add points based on answers
-      if (formData.hasHome) lifeScore += 2000;
-      if (formData.hasCar) lifeScore += 500;
-      if (formData.education === 'bachelors') lifeScore += 1500;
-      if (formData.education === 'masters') lifeScore += 2000;
-      if (formData.education === 'doctorate') lifeScore += 2500;
-      if (formData.languages?.length > 1) lifeScore += formData.languages.length * 200;
-      if (formData.salary) lifeScore += Math.min(formData.salary / 10, 2000);
-
-      // Prepare user data
-      const userData = {
-        ...formData,
-        lifeScore,
-        wealth: {
-          salary: formData.salary || 0,
-          savings: 0,
-          investments: 0,
-          currency: 'USD',
-          total: formData.salary || 0
-        },
-        knowledge: {
-          education: formData.education || '',
-          certificates: [],
-          languages: formData.languages || ['English'],
-          total: formData.languages?.length * 200 || 200
-        },
-        assets: []
-      };
-
-      // Add assets based on answers
-      if (formData.hasHome) {
-        userData.assets.push({
-          id: crypto.randomUUID(),
-          type: 'home',
-          name: 'Primary Residence',
-          value: 300000,
-          verified: false
-        });
-      }
-
-      if (formData.hasCar) {
-        userData.assets.push({
-          id: crypto.randomUUID(),
-          type: 'car',
-          name: 'Personal Vehicle',
-          value: 25000,
-          verified: false
-        });
-      }
-
-      // Update user data
-      await updateUser(userData);
-
-      // Show welcome badges
-      const welcomeBadges = [
-        ALL_BADGES.find(b => b.id === 'welcome-aboard'),
-        ALL_BADGES.find(b => b.id === 'profile-complete'),
-        formData.hasHome ? ALL_BADGES.find(b => b.id === 'homeowner') : null,
-        formData.hasCar ? ALL_BADGES.find(b => b.id === 'car-owner') : null,
-        (formData.salary && formData.salary >= 50000) ? ALL_BADGES.find(b => b.id === 'wealth-apprentice') : null
-      ].filter(Boolean);
-
-      setBadgesToShow(welcomeBadges);
-      setShowBadges(true);
-      triggerConfetti();
-    } catch (error) {
-      console.error('Error completing onboarding:', error);
-    }
-  };
-
   const CurrentStepComponent = steps[currentStep];
-
-  if (showBadges) {
-    return (
-      <BadgeUnlockModal
-        badges={badgesToShow}
-        isOpen={showBadges}
-        onClose={() => setShowBadges(false)}
-        onSkipAll={() => setShowBadges(false)}
-      />
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center p-4">
