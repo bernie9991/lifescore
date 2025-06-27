@@ -877,7 +877,7 @@ export const useAuthProvider = () => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [loadUserData, initializeNewUserData, handleAuthError, logout]);
+  }, [loadUserData, handleAuthError, logout]);
 
   const login = useCallback(async (email: string, password: string): Promise<void> => {
     try {
