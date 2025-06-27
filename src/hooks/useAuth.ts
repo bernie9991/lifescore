@@ -6,12 +6,12 @@ import { updateUserLifeScore } from '../utils/lifeScoreEngine';
 import { checkBadgeUnlocks, getDefaultBadgesForNewUser, ALL_BADGES } from '../utils/badgeSystem';
 import toast from 'react-hot-toast';
 
-// Enhanced timeout configuration with different timeouts for different operations
+// Enhanced timeout configuration with reasonable timeout values
 const TIMEOUT_CONFIG = {
-  AUTH_OPERATIONS: 150000,    // 15 seconds for auth operations
-  DATABASE_QUERIES: 100000,   // 10 seconds for database queries
-  USER_CREATION: 200000,      // 20 seconds for user creation
-  SESSION_CHECK: 50000        // 5 seconds for session checks
+  AUTH_OPERATIONS: 15000,     // 15 seconds for auth operations
+  DATABASE_QUERIES: 10000,    // 10 seconds for database queries
+  USER_CREATION: 20000,       // 20 seconds for user creation
+  SESSION_CHECK: 5000         // 5 seconds for session checks
 };
 
 // Enhanced error types for better error handling
