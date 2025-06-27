@@ -59,7 +59,8 @@ interface AuthContextType {
     clearError: () => void;
 }
 
-const AuthContext = createContext<AuthContextType>({
+// **MODIFICATION HERE: Added 'export'**
+export const AuthContext = createContext<AuthContextType>({
     user: null,
     isAuthenticated: false,
     isAdmin: false,
@@ -129,7 +130,7 @@ export const useAuthProvider = () => {
         } else if (error.message?.includes('Invalid login credentials')) {
             authError = { type: AuthErrorType.AUTH_ERROR, message: 'Invalid email or password.', originalError: error, timestamp: new Date() };
         } else if (error.message?.includes('User already registered')) {
-            authError = { type: AuthErrorType.VALIDATION_ERROR, message: 'An account with this email already exists.', originalError: error, timestamp: new Date() };
+            authError = { type: AuthErrorType.VALIDATION_ERROR, message: 'An account with this email already exists.', originalError: error, timestamp: new Dtate() };
         } else {
             authError = { type: AuthErrorType.UNKNOWN_ERROR, message: error.message || `${operation} failed.`, originalError: error, timestamp: new Date() };
         }
