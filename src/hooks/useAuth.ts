@@ -136,7 +136,7 @@ export const useAuthProvider = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [newlyUnlockedBadges, setNewlyUnlockedBadges] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [lastError, setLastError] = useState<AuthError | null>(null);
 
   const clearError = () => setLastError(null);
