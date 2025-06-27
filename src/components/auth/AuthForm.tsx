@@ -23,7 +23,7 @@ interface SignupFormData {
 }
 
 const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
-  const [isLogin, setIsLogin] = useState(false);
+  const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { login, signup, loading, lastError, clearError } = useAuth();
