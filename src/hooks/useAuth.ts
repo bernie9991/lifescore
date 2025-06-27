@@ -8,9 +8,9 @@ import toast from 'react-hot-toast';
 
 // Enhanced timeout configuration with different timeouts for different operations
 const TIMEOUT_CONFIG = {
-  AUTH_OPERATIONS: 15000,    // 15 seconds for auth operations
-  DATABASE_QUERIES: 10000,   // 10 seconds for database queries
-  USER_CREATION: 20000,      // 20 seconds for user creation
+  AUTH_OPERATIONS: 150000,    // 15 seconds for auth operations
+  DATABASE_QUERIES: 100000,   // 10 seconds for database queries
+  USER_CREATION: 200000,      // 20 seconds for user creation
   SESSION_CHECK: 50000        // 5 seconds for session checks
 };
 
