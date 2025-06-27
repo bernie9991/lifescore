@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { AuthContext, useAuthProvider } from './hooks/useAuth.tsx';
+import { AuthContext, useAuthProvider } from './hooks/useAuth';
 import HomePage from './pages/HomePage';
 import OnboardingFlow from './components/onboarding/OnboardingFlow';
 import Dashboard from './components/dashboard/Dashboard';
