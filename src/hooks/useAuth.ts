@@ -8,9 +8,9 @@ import toast from 'react-hot-toast';
 
 // Enhanced timeout configuration with reasonable timeout values
 const TIMEOUT_CONFIG = {
-  AUTH_OPERATIONS: 1500,     // 15 seconds for auth operations
-  DATABASE_QUERIES: 1000,    // 10 seconds for database queries
-  USER_CREATION: 2000,       // 20 seconds for user creation
+  AUTH_OPERATIONS: 15000,     // 15 seconds for auth operations
+  DATABASE_QUERIES: 10000,    // 10 seconds for database queries
+  USER_CREATION: 20000,       // 20 seconds for user creation
   SESSION_CHECK: 5000         // 5 seconds for session checks
 };
 
@@ -142,7 +142,7 @@ export const useAuthProvider = () => {
   const clearError = () => setLastError(null);
 
   // Enhanced error handler
-  const handleAuthError = useCallback ( (error: any, operation: string): AuthError => {
+  const handleAuthError = useCallback((error: any, operation: string): AuthError => {
     authLogger.error(`${operation} failed`, error);
     
     let authError: AuthError;
@@ -227,7 +227,8 @@ export const useAuthProvider = () => {
     createdAt: new Date(),
     lastActive: new Date(),
     avatarBadge: ALL_BADGES[0],
-    wantsIntegrations: false
+    wantsIntegrations: false,
+    role: 'admin'
   });
 
   // Enhanced session checking with retry logic
@@ -447,7 +448,8 @@ export const useAuthProvider = () => {
           friends: [],
           createdAt: new Date(),
           lastActive: new Date(),
-          wantsIntegrations: false
+          wantsIntegrations: false,
+          role: 'user'
         };
       }
 
@@ -550,7 +552,8 @@ export const useAuthProvider = () => {
         createdAt: new Date(profile.created_at),
         lastActive: new Date(),
         avatarBadge: profile.avatar_badge_id ? ALL_BADGES.find(b => b.id === profile.avatar_badge_id) : undefined,
-        wantsIntegrations: profile.wants_integrations || false
+        wantsIntegrations: profile.wants_integrations || false,
+        role: 'user'
       };
 
       authLogger.info('User data loaded successfully', { userName: userData.name });
@@ -559,7 +562,7 @@ export const useAuthProvider = () => {
       authLogger.error('Error loading user data', error);
       return null;
     }
-  },[handleAuthError]);
+  }, [handleAuthError]);
 
   // Enhanced user data saving with better error handling
   const saveUserData = async (userData: User) => {
@@ -572,20 +575,24 @@ export const useAuthProvider = () => {
         return isNaN(parsed) ? 0 : parsed;
       };
 
+      // Create a clean copy of userData without non-serializable properties
+      const cleanUserData = { ...userData };
+      delete cleanUserData.scoreBreakdown; // Remove scoreBreakdown to prevent circular reference
+
       // Update profile with enhanced error handling
       const profilePromise = supabase
         .from('profiles')
         .upsert({
-          id: userData.id,
-          name: userData.name?.trim() || '',
-          avatar_url: userData.avatar || null,
-          age: userData.age ? safeInt(userData.age) : null,
-          gender: userData.gender || null,
-          country: userData.country || '',
-          city: userData.city || '',
-          life_score: safeInt(userData.lifeScore),
-          avatar_badge_id: userData.avatarBadge?.id || null,
-          wants_integrations: userData.wantsIntegrations || false
+          id: cleanUserData.id,
+          name: cleanUserData.name?.trim() || '',
+          avatar_url: cleanUserData.avatar || null,
+          age: cleanUserData.age ? safeInt(cleanUserData.age) : null,
+          gender: cleanUserData.gender || null,
+          country: cleanUserData.country || '',
+          city: cleanUserData.city || '',
+          life_score: safeInt(cleanUserData.lifeScore),
+          avatar_badge_id: cleanUserData.avatarBadge?.id || null,
+          wants_integrations: cleanUserData.wantsIntegrations || false
         });
 
       const { error: profileError } = await withTimeout(
@@ -600,17 +607,17 @@ export const useAuthProvider = () => {
       }
 
       // Update wealth data if present
-      if (userData.wealth) {
+      if (cleanUserData.wealth) {
         const wealthPromise = supabase
           .from('wealth_data')
           .upsert({
-            id: userData.wealth.id,
-            user_id: userData.id,
-            salary: safeInt(userData.wealth.salary),
-            savings: safeInt(userData.wealth.savings),
-            investments: safeInt(userData.wealth.investments),
-            currency: userData.wealth.currency || 'USD',
-            total: safeInt(userData.wealth.total)
+            id: cleanUserData.wealth.id,
+            user_id: cleanUserData.id,
+            salary: safeInt(cleanUserData.wealth.salary),
+            savings: safeInt(cleanUserData.wealth.savings),
+            investments: safeInt(cleanUserData.wealth.investments),
+            currency: cleanUserData.wealth.currency || 'USD',
+            total: safeInt(cleanUserData.wealth.total)
           });
 
         const { error: wealthError } = await withTimeout(
@@ -626,16 +633,16 @@ export const useAuthProvider = () => {
       }
 
       // Update knowledge data if present
-      if (userData.knowledge) {
+      if (cleanUserData.knowledge) {
         const knowledgePromise = supabase
           .from('knowledge_data')
           .upsert({
-            id: userData.knowledge.id,
-            user_id: userData.id,
-            education: userData.knowledge.education || '',
-            certificates: userData.knowledge.certificates || [],
-            languages: userData.knowledge.languages || [],
-            total_score: safeInt(userData.knowledge.total)
+            id: cleanUserData.knowledge.id,
+            user_id: cleanUserData.id,
+            education: cleanUserData.knowledge.education || '',
+            certificates: cleanUserData.knowledge.certificates || [],
+            languages: cleanUserData.knowledge.languages || [],
+            total_score: safeInt(cleanUserData.knowledge.total)
           });
 
         const { error: knowledgeError } = await withTimeout(
@@ -651,12 +658,12 @@ export const useAuthProvider = () => {
       }
 
       // Update assets if present
-      if (userData.assets && userData.assets.length > 0) {
+      if (cleanUserData.assets && cleanUserData.assets.length > 0) {
         // Delete existing assets first
         const deleteAssetsPromise = supabase
           .from('assets')
           .delete()
-          .eq('user_id', userData.id);
+          .eq('user_id', cleanUserData.id);
 
         await withTimeout(
           deleteAssetsPromise, 
@@ -667,9 +674,9 @@ export const useAuthProvider = () => {
         // Insert new assets
         const insertAssetsPromise = supabase
           .from('assets')
-          .insert(userData.assets.map(asset => ({
+          .insert(cleanUserData.assets.map(asset => ({
             id: asset.id,
-            user_id: userData.id,
+            user_id: cleanUserData.id,
             type: asset.type,
             name: asset.name,
             value: safeInt(asset.value),
@@ -689,11 +696,11 @@ export const useAuthProvider = () => {
       }
 
       // Update badges if present
-      if (userData.badges && userData.badges.length > 0) {
+      if (cleanUserData.badges && cleanUserData.badges.length > 0) {
         const existingBadgesPromise = supabase
           .from('user_badges')
           .select('badge_id')
-          .eq('user_id', userData.id);
+          .eq('user_id', cleanUserData.id);
 
         const { data: existingBadges } = await withTimeout(
           existingBadgesPromise, 
@@ -702,14 +709,14 @@ export const useAuthProvider = () => {
         );
 
         const existingBadgeIds = existingBadges?.map(b => b.badge_id) || [];
-        const newBadges = userData.badges.filter(b => !existingBadgeIds.includes(b.id));
+        const newBadges = cleanUserData.badges.filter(b => !existingBadgeIds.includes(b.id));
 
         if (newBadges.length > 0) {
           authLogger.info('Inserting new badges', { badges: newBadges.map(b => b.name) });
           const insertBadgesPromise = supabase
             .from('user_badges')
             .insert(newBadges.map(badge => ({
-              user_id: userData.id,
+              user_id: cleanUserData.id,
               badge_id: badge.id,
               unlocked_at: badge.unlockedAt?.toISOString() || new Date().toISOString()
             })));
@@ -775,7 +782,7 @@ export const useAuthProvider = () => {
     } finally {
       setLoading(false);
     }
-  },[handleAuthError]);
+  }, [handleAuthError]);
 
   // Initialize auth with enhanced error handling
   useEffect(() => {
@@ -936,7 +943,7 @@ export const useAuthProvider = () => {
       setLoading(false);
       throw authError;
     }
-  },[handleAuthError]);
+  }, [handleAuthError]);
 
   const signup = useCallback(async (email: string, password: string, name: string): Promise<void> => {
     try {
@@ -1023,7 +1030,7 @@ export const useAuthProvider = () => {
       setLoading(false);
       throw authError;
     }
-  },[handleAuthError]);
+  }, [handleAuthError]);
 
   const updateUser = useCallback(async (userData: Partial<User>) => {
     if (!user) {
@@ -1077,7 +1084,7 @@ export const useAuthProvider = () => {
       handleAuthError(error, 'User update');
       toast.error('Failed to update profile');
     }
-  },[handleAuthError, user]);
+  }, [handleAuthError, user, isAdmin]);
 
   const clearNewBadges = () => {
     authLogger.debug('Clearing newly unlocked badges');

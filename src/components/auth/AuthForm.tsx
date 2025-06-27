@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Mail, Lock, User, Sparkles, AlertCircle, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Sparkles, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import Button from '../common/Button';
 import toast from 'react-hot-toast';
@@ -87,7 +87,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ delay: 0.2 }}
+            transition={{ delay: 0.2, type: "spring", bounce: 0.5 }}
             className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4"
           >
             <Sparkles className="w-8 h-8 text-white" />
@@ -126,7 +126,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
               onClick={clearError}
               className="text-red-400 hover:text-red-300 ml-auto"
             >
-             
+              <X className="w-4 h-4" />
             </button>
           </motion.div>
         )}
