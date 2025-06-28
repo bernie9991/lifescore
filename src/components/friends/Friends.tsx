@@ -1,19 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Users, 
-  Search, 
-  UserPlus, 
-  Check, 
-  X, 
-  Bell,
-  Heart,
-  Laugh,
-  ThumbsUp,
-  Fire,
-  Smile,
-  Clock
-} from 'lucide-react';
+import { Users, Search, UserPlus, Check, X, Bell, Heart, Laugh, ThumbsUp, Siren as Fire, Smile, Clock } from 'lucide-react';
 import { User } from '../../types';
 import { formatNumber, triggerEmojiConfetti } from '../../utils/animations';
 import { db } from '../../lib/firebase';
