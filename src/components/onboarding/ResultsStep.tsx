@@ -46,10 +46,14 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ data, onNext }) => {
     return () => clearTimeout(timer);
   }, [data, lifeScore, onNext]);
 
-  const handleComplete = () => {
-    // Navigate to dashboard - the onboarding completion will be handled by the auth system
-    navigate('/dashboard');
-  };
+const handleComplete = () => {
+  // *** CRITICAL CHANGE HERE: Set the completion flag BEFORE navigating ***
+  localStorage.setItem('lifescore_onboarding_complete', 'true');
+
+  // Navigate to dashboard
+  navigate('/dashboard');
+};
+
 
   if (!showResults) {
     return (
