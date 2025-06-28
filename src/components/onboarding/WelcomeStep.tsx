@@ -70,9 +70,10 @@ const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
         animate={{ opacity: 1 }}
         transition={{ delay: 0.6 }}
       >
-        <Button onClick={onNext} size="lg">
-          Let's Get Started! 🚀
-        </Button>
+       <Button onClick={() => onNext()} size="lg"> {/* <--- Added () => and () */}
+  Let's Get Started! 🚀
+</Button>
+
       </motion.div>
     </div>
   );
