@@ -160,6 +160,10 @@ export const useAuthProvider = () => {
 
   const clearError = () => setLastError(null);
 
+  const clearNewBadges = useCallback(() => {
+    setNewlyUnlockedBadges([]);
+  }, []);
+
   // Enhanced error handler
   const handleAuthError = useCallback((error: any, operation: string): AuthError => {
     authLogger.error(`${operation} failed`, error);
@@ -758,10 +762,7 @@ export const useAuthProvider = () => {
       handleAuthError(error, 'User update');
       toast.error('Failed to update profile');
     }
-  }, [handleAuthError, user, isAdmin, db, auth.currentUser]); // Added db, auth.currentUser to dependencies for useCallback
-
-  // ... rest of useAuth hook ...
-
+  }, [handleAuthError, user, isAdmin]);
 
   return {
     user,
