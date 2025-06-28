@@ -238,6 +238,7 @@ export const useAuthProvider = () => {
   // Create mock admin user
   const createMockAdminUser = (): User => ({
     id: 'admin-user-id',
+    uid: 'admin-user-id', // Add uid field
     name: 'Admin User',
     email: 'admin@lifescore.com',
     avatar: undefined,
@@ -246,6 +247,7 @@ export const useAuthProvider = () => {
     country: 'Global',
     city: 'Admin City',
     lifeScore: 1000,
+    username: 'admin', // Add username field
     wealth: {
       salary: 100000,
       savings: 50000,
@@ -272,11 +274,10 @@ export const useAuthProvider = () => {
     lastActive: new Date(),
     avatarBadge: ALL_BADGES[0],
     wantsIntegrations: false,
-    role: 'admin',
-    username: 'admin'
+    role: 'admin'
   });
 
-  // Initialize user data in Firestore - FIXED VERSION
+  // Initialize user data in Firestore
   const initializeUserData = async (userId: string, name: string, email: string) => {
     authLogger.info('Initializing user data in Firestore', { userId, name, email });
     
@@ -444,7 +445,7 @@ export const useAuthProvider = () => {
         country: userData.country || '',
         city: userData.city || '',
         lifeScore: userData.lifeScore || 0,
-        username: userData.username || null, // CRITICAL: Preserve null for onboarding
+        username: userData.username, // CRITICAL: Preserve null for onboarding
         wealth: userData.wealth || {
           salary: 0,
           savings: 0,

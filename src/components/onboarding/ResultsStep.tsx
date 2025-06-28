@@ -37,7 +37,7 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ data, onNext }) => {
       const completeUserData = {
         ...data,
         lifeScore,
-        username: data.name?.toLowerCase().replace(/\s+/g, '') + Math.floor(Math.random() * 1000) // Generate a default username
+        username: data.username || (data.name?.toLowerCase().replace(/\s+/g, '') + Math.floor(Math.random() * 1000)) // Use provided username or generate a default one
       };
       
       // Pass the complete data to parent

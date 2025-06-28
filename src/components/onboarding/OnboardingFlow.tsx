@@ -6,6 +6,7 @@ import BasicInfoStep from './BasicInfoStep';
 import WealthStep from './WealthStep';
 import AssetsStep from './AssetsStep';
 import KnowledgeStep from './KnowledgeStep';
+import UsernameStep from './UsernameStep';
 import ResultsStep from './ResultsStep';
 
 const OnboardingFlow: React.FC = () => {
@@ -19,6 +20,7 @@ const OnboardingFlow: React.FC = () => {
     WealthStep,
     AssetsStep,
     KnowledgeStep,
+    UsernameStep, // Include the username step
     ResultsStep
   ];
 
@@ -32,7 +34,6 @@ const OnboardingFlow: React.FC = () => {
     } else {
       // Complete onboarding
       updateUser(formData);
-      localStorage.setItem('lifescore_onboarding_complete', 'true'); 
     }
   };
 

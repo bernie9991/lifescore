@@ -1,6 +1,6 @@
 export interface User {
   id: string;
-  uid?: string; // Add uid field for compatibility
+  uid: string; // Add uid field for compatibility
   name: string;
   email: string;
   avatar?: string;
@@ -10,7 +10,7 @@ export interface User {
   country: string;
   city: string;
   lifeScore: number;
-  username?: string | null; // Add username field for onboarding check
+  username: string | null; // Add username field for onboarding check
   wealth: WealthData;
   knowledge: KnowledgeData;
   assets: Asset[];
