@@ -240,6 +240,7 @@ export const useAuthProvider = () => {
     id: 'admin-user-id',
     name: 'Admin User',
     email: 'admin@lifescore.com',
+    username: 'admin',
     avatar: undefined,
     age: undefined,
     gender: undefined,
@@ -272,10 +273,11 @@ export const useAuthProvider = () => {
     lastActive: new Date(),
     avatarBadge: ALL_BADGES[0],
     wantsIntegrations: false,
+    isRealNameVisible: true,
     role: 'admin'
   });
 
-  // Initialize user data in Firestore
+  // Initialize user data in Firestore (only for new users)
   const initializeUserData = async (userId: string, name: string, email: string) => {
     authLogger.info('Initializing user data in Firestore', { userId, name, email });
     
@@ -297,6 +299,7 @@ export const useAuthProvider = () => {
         id: userId,
         name: name.trim(),
         email: email.trim().toLowerCase(),
+        username: '', // Will be set during onboarding
         avatar: null,
         age: null,
         gender: null,
@@ -305,6 +308,7 @@ export const useAuthProvider = () => {
         lifeScore: 0,
         avatarBadgeId: null,
         wantsIntegrations: false,
+        isRealNameVisible: false,
         wealth: {
           salary: 0,
           savings: 0,
@@ -370,15 +374,12 @@ export const useAuthProvider = () => {
       );
 
       if (!userDocSnap.exists()) {
-        authLogger.warn('User profile not found, creating minimal user for onboarding');
-        
-        // *** CRITICAL: Clear onboarding completion flag for new users ***
-        localStorage.removeItem('lifescore_onboarding_complete');
-        
+        authLogger.warn('User profile not found, creating default user for onboarding');
         return {
           id: firebaseUser.uid,
           name: firebaseUser.displayName || '',
           email: firebaseUser.email || '',
+          username: '',
           avatar: firebaseUser.photoURL,
           age: undefined,
           gender: undefined,
@@ -404,6 +405,7 @@ export const useAuthProvider = () => {
           createdAt: new Date(),
           lastActive: new Date(),
           wantsIntegrations: false,
+          isRealNameVisible: false,
           role: 'user'
         };
       }
@@ -436,6 +438,7 @@ export const useAuthProvider = () => {
         id: userData.id,
         name: userData.name || '',
         email: userData.email || firebaseUser.email || '',
+        username: userData.username || '',
         avatar: userData.avatar || firebaseUser.photoURL,
         age: userData.age,
         gender: userData.gender,
@@ -462,6 +465,7 @@ export const useAuthProvider = () => {
         lastActive: new Date(),
         avatarBadge: userData.avatarBadgeId ? ALL_BADGES.find(b => b.id === userData.avatarBadgeId) : undefined,
         wantsIntegrations: userData.wantsIntegrations || false,
+        isRealNameVisible: userData.isRealNameVisible || false,
         role: userData.role || 'user'
       };
 
@@ -510,7 +514,7 @@ export const useAuthProvider = () => {
     }
   }, [handleAuthError, isAdmin]);
 
-  // Initialize auth with Firebase
+  // Initialize auth with Firebase - FIXED VERSION
   useEffect(() => {
     let isMounted = true;
 
@@ -522,6 +526,28 @@ export const useAuthProvider = () => {
       try {
         if (firebaseUser) {
           authLogger.info('Firebase user authenticated', { userId: firebaseUser.uid, email: firebaseUser.email });
+          
+          // CRITICAL FIX: Check if user document exists before creating/overwriting
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          const userDocSnap = await withTimeout(
+            getDoc(userDocRef),
+            TIMEOUT_CONFIG.DATABASE_QUERIES,
+            'user document existence check'
+          );
+
+          // Only initialize data for NEW users (document doesn't exist)
+          if (!userDocSnap.exists()) {
+            authLogger.info('New user detected - initializing default data');
+            await initializeUserData(
+              firebaseUser.uid, 
+              firebaseUser.displayName || 'User', 
+              firebaseUser.email || ''
+            );
+          } else {
+            authLogger.info('Existing user detected - loading saved data');
+          }
+
+          // Load user data (either newly created or existing)
           const userData = await loadUserData(firebaseUser);
           
           if (userData && isMounted) {
@@ -617,9 +643,6 @@ export const useAuthProvider = () => {
       clearError();
       authLogger.info('Attempting signup', { email, name });
       
-      // *** CRITICAL: Clear onboarding completion flag for new signups ***
-      localStorage.removeItem('lifescore_onboarding_complete');
-      
       // Input validation
       if (!validateEmail(email)) {
         throw new Error('Please enter a valid email address');
@@ -655,33 +678,10 @@ export const useAuthProvider = () => {
         displayName: name.trim()
       });
 
-      // Step 3: Initialize user data in Firestore
-      authLogger.info('Initializing user data in Firestore...');
-      await initializeUserData(userCredential.user.uid, name.trim(), email.trim().toLowerCase());
+      // Step 3: Initialize user data will be handled by onAuthStateChanged
+      // since the user document doesn't exist yet, it will be created automatically
 
-      // Step 4: Load complete user data
-      authLogger.info('Loading complete user data...');
-      const userData = await loadUserData(userCredential.user);
-      
-      if (!userData) {
-        throw new Error('Failed to load user data after signup');
-      }
-
-      // Step 5: Set up badges for celebration
-      authLogger.info('Setting up welcome badges...');
-      const defaultBadges = getDefaultBadgesForNewUser(userData);
-      
-      if (defaultBadges.length > 0) {
-        authLogger.info('Setting newly unlocked badges for display', { badges: defaultBadges.map(b => b.name) });
-        setNewlyUnlockedBadges(defaultBadges);
-        userData.badges = [...userData.badges, ...defaultBadges];
-      }
-
-      // Step 6: Set user state
-      setUser(userData);
-      setIsAuthenticated(true);
-      
-      authLogger.info('Signup completed successfully - user will need onboarding');
+      authLogger.info('Signup completed successfully');
       return;
     } catch (error) {
       const authError = handleAuthError(error, 'Signup');
@@ -689,7 +689,7 @@ export const useAuthProvider = () => {
     } finally {
       setLoading(false);
     }
-  }, [handleAuthError, loadUserData]);
+  }, [handleAuthError]);
 
   const updateUser = useCallback(async (userData: Partial<User>) => {
     // If user is null, there's nothing to update for Firestore
