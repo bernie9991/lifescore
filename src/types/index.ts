@@ -11,6 +11,7 @@ export interface User {
   city: string;
   lifeScore: number;
   username: string | null; // Add username field for onboarding check
+  isRealNameVisible?: boolean; // Add field to control name visibility
   wealth: WealthData;
   knowledge: KnowledgeData;
   assets: Asset[];

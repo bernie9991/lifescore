@@ -52,6 +52,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
     country: user?.country || '',
     age: user?.age || '',
     gender: user?.gender || '',
+    isRealNameVisible: user?.isRealNameVisible || false,
   });
 
   // Ensure user exists
@@ -96,6 +97,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
       country: user?.country || '',
       age: user?.age || '',
       gender: user?.gender || '',
+      isRealNameVisible: user?.isRealNameVisible || false,
     });
     setIsEditing(false);
   };
@@ -374,6 +376,27 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
                         <option value="prefer-not-to-say">Prefer not to say</option>
                       </select>
                     </div>
+                    
+                    {/* Name Visibility Toggle */}
+                    <div className="bg-gray-900 p-4 rounded-lg border border-gray-600">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium text-white">Show my real name publicly</h4>
+                          <p className="text-gray-400 text-sm">
+                            When enabled, other users will see your real name instead of your username
+                          </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={editData.isRealNameVisible}
+                            onChange={(e) => setEditData({...editData, isRealNameVisible: e.target.checked})}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -396,6 +419,18 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
                         {formatNumber(user.lifeScore || 0)} XP
                       </div>
                       <div className="text-gray-300">LifeScore</div>
+                    </div>
+                    
+                    {/* Username Display */}
+                    <div className="mt-3 text-center md:text-left">
+                      <div className="text-sm text-gray-400">
+                        Username: <span className="text-gray-300">@{user.username}</span>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {user.isRealNameVisible ? 
+                          'Your real name is visible to others' : 
+                          'Only your username is visible to others'}
+                      </div>
                     </div>
                   </>
                 )}

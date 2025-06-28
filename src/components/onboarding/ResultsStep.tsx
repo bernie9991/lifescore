@@ -32,12 +32,15 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ data, onNext }) => {
       setShowResults(true);
       triggerConfetti();
       
-      // Create complete user data with LifeScore and username set to a value (not null)
-      // This will prevent the onboarding from triggering again
+      // Generate a random username based on name
+      const randomUsername = generateUsername(data.name);
+      
+      // Create complete user data with LifeScore and username
       const completeUserData = {
         ...data,
         lifeScore,
-        username: data.username || (data.name?.toLowerCase().replace(/\s+/g, '') + Math.floor(Math.random() * 1000)) // Use provided username or generate a default one
+        username: randomUsername,
+        isRealNameVisible: false // Default to not showing real name
       };
       
       // Pass the complete data to parent
@@ -46,6 +49,13 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ data, onNext }) => {
 
     return () => clearTimeout(timer);
   }, [data, lifeScore, onNext]);
+
+  const generateUsername = (name: string): string => {
+    // Generate a username based on name with random numbers
+    const baseName = name?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'user';
+    const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    return `${baseName}${randomSuffix}`;
+  };
 
   const handleComplete = () => {
     // Navigate to dashboard - onboarding is now complete

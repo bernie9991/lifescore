@@ -150,6 +150,13 @@ const validateName = (name: string): { isValid: boolean; message?: string } => {
   return { isValid: true };
 };
 
+// Generate a random username based on name
+const generateRandomUsername = (name: string): string => {
+  const baseName = name.toLowerCase().replace(/[^a-z0-9]/g, '') || 'user';
+  const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  return `${baseName}${randomSuffix}`;
+};
+
 export const useAuthProvider = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -248,6 +255,7 @@ export const useAuthProvider = () => {
     city: 'Admin City',
     lifeScore: 1000,
     username: 'admin', // Add username field
+    isRealNameVisible: true,
     wealth: {
       salary: 100000,
       savings: 50000,
@@ -293,6 +301,9 @@ export const useAuthProvider = () => {
         throw new Error('Invalid email format');
       }
 
+      // Generate a random username
+      const randomUsername = generateRandomUsername(name);
+
       // Create user profile document with ALL required fields
       const userDocRef = doc(db, 'users', userId);
       const userData = {
@@ -309,6 +320,7 @@ export const useAuthProvider = () => {
         avatarBadgeId: null,
         wantsIntegrations: false,
         username: null, // CRITICAL: Set username to null for onboarding trigger
+        isRealNameVisible: false, // Default to not showing real name
         wealth: {
           salary: 0,
           savings: 0,
@@ -387,6 +399,7 @@ export const useAuthProvider = () => {
           city: '',
           lifeScore: 0,
           username: null, // CRITICAL: Set to null to trigger onboarding
+          isRealNameVisible: false,
           wealth: {
             salary: 0,
             savings: 0,
@@ -446,6 +459,7 @@ export const useAuthProvider = () => {
         city: userData.city || '',
         lifeScore: userData.lifeScore || 0,
         username: userData.username, // CRITICAL: Preserve null for onboarding
+        isRealNameVisible: userData.isRealNameVisible || false,
         wealth: userData.wealth || {
           salary: 0,
           savings: 0,
