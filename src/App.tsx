@@ -4,7 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthContext, useAuthProvider } from './hooks/useAuth';
 import HomePage from './pages/HomePage';
 import OnboardingFlow from './components/onboarding/OnboardingFlow';
-import Dashboard from './components/dashboard/Dashboard';
+import MainAppLayout from './components/layout/MainAppLayout';
 import AdminPanel from './components/admin/AdminPanel';
 import BadgeUnlockModal from './components/badges/BadgeUnlockModal';
 
@@ -58,7 +58,7 @@ const AppContent: React.FC = () => {
           path="/dashboard" 
           element={
             isAuthenticated && !isAdmin && !needsOnboarding ? (
-              <Dashboard />
+              <MainAppLayout />
             ) : isAuthenticated && isAdmin ? (
               <Navigate to="/admin" replace />
             ) : isAuthenticated && needsOnboarding ? (
