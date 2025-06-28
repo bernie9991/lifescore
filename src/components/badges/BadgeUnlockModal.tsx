@@ -36,7 +36,6 @@ const BadgeUnlockModal: React.FC<BadgeUnlockModalProps> = ({
   const [currentBadgeIndex, setCurrentBadgeIndex] = useState(0);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [hasTriggeredConfetti, setHasTriggeredConfetti] = useState(false);
-  const [showWelcomeMessage, setShowWelcomeMessage] = useState(true);
 
   const currentBadge = badges[currentBadgeIndex];
   const hasMultipleBadges = badges.length > 1;
@@ -47,34 +46,26 @@ const BadgeUnlockModal: React.FC<BadgeUnlockModalProps> = ({
   console.log('🏅 BADGE MODAL: Current badge index =', currentBadgeIndex);
   console.log('🏅 BADGE MODAL: Current badge =', currentBadge);
 
-  // Show welcome message first, then badges
+  // Reset state when modal opens
   useEffect(() => {
     if (isOpen && badges.length > 0) {
-      console.log('🏅 BADGE MODAL: Modal opened, showing welcome message');
+      console.log('🏅 BADGE MODAL: Modal opened, resetting state');
       setCurrentBadgeIndex(0);
       setShowShareMenu(false);
       setHasTriggeredConfetti(false);
-      setShowWelcomeMessage(true);
-      
-      // Show welcome message for 3 seconds, then show first badge
-      const timer = setTimeout(() => {
-        setShowWelcomeMessage(false);
-      }, 3000);
-      
-      return () => clearTimeout(timer);
     }
   }, [isOpen, badges.length]);
 
-  // Trigger confetti when badge is shown (not during welcome)
+  // Trigger confetti when badge is shown
   useEffect(() => {
-    if (isOpen && currentBadge && !hasTriggeredConfetti && !showWelcomeMessage) {
+    if (isOpen && currentBadge && !hasTriggeredConfetti) {
       console.log('🏅 BADGE MODAL: Triggering confetti for badge:', currentBadge.name);
       setTimeout(() => {
         triggerBadgeConfetti(currentBadge.category);
       }, 500);
       setHasTriggeredConfetti(true);
     }
-  }, [isOpen, currentBadge, hasTriggeredConfetti, showWelcomeMessage]);
+  }, [isOpen, currentBadge, hasTriggeredConfetti]);
 
   const handleNext = () => {
     if (isLastBadge) {
@@ -182,48 +173,8 @@ const BadgeUnlockModal: React.FC<BadgeUnlockModalProps> = ({
             onClick={onClose}
           />
 
-          {/* Welcome Message */}
-          {showWelcomeMessage && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8, y: 50 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.8, y: -50 }}
-              transition={{ type: "spring", duration: 0.6, bounce: 0.3 }}
-              className="relative bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-600 rounded-3xl border-2 border-white/20 p-8 w-full max-w-lg text-center shadow-2xl"
-            >
-              <motion.div
-                animate={{ 
-                  scale: [1, 1.2, 1],
-                  rotate: [0, 10, -10, 0]
-                }}
-                transition={{ 
-                  duration: 2, 
-                  repeat: Infinity, 
-                  ease: "easeInOut" 
-                }}
-                className="text-8xl mb-6"
-              >
-                🎉
-              </motion.div>
-              
-              <h1 className="text-4xl font-bold text-white mb-4">
-                Welcome to LifeScore!
-              </h1>
-              
-              <p className="text-xl text-white/90 mb-6 leading-relaxed">
-                You're already ahead of billions — let's celebrate your achievements!
-              </p>
-              
-              <div className="flex items-center justify-center space-x-2 text-white/80">
-                <Sparkles className="w-5 h-5" />
-                <span className="text-lg">Preparing your badges...</span>
-                <Sparkles className="w-5 h-5" />
-              </div>
-            </motion.div>
-          )}
-
           {/* Badge Modal */}
-          {!showWelcomeMessage && currentBadge && (
+          {currentBadge && (
             <motion.div
               initial={{ opacity: 0, scale: 0.8, y: 50 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
