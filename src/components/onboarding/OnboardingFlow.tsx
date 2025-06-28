@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import WelcomeStep from './WelcomeStep';
 import BasicInfoStep from './BasicInfoStep';
+import UsernameStep from './UsernameStep';
 import WealthStep from './WealthStep';
 import AssetsStep from './AssetsStep';
 import KnowledgeStep from './KnowledgeStep';
@@ -16,6 +17,7 @@ const OnboardingFlow: React.FC = () => {
   const steps = [
     WelcomeStep,
     BasicInfoStep,
+    UsernameStep,
     WealthStep,
     AssetsStep,
     KnowledgeStep,

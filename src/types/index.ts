@@ -2,6 +2,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  username: string;
   avatar?: string;
   avatarBadge?: Badge;
   age?: number;
@@ -18,6 +19,7 @@ export interface User {
   lastActive: Date;
   scoreBreakdown?: any;
   wantsIntegrations?: boolean;
+  isRealNameVisible: boolean;
   role: string;
 }
 

@@ -240,6 +240,7 @@ export const useAuthProvider = () => {
     id: 'admin-user-id',
     name: 'Admin User',
     email: 'admin@lifescore.com',
+    username: 'admin',
     avatar: undefined,
     age: undefined,
     gender: undefined,
@@ -272,6 +273,7 @@ export const useAuthProvider = () => {
     lastActive: new Date(),
     avatarBadge: ALL_BADGES[0],
     wantsIntegrations: false,
+    isRealNameVisible: true,
     role: 'admin'
   });
 
@@ -297,6 +299,7 @@ export const useAuthProvider = () => {
         id: userId,
         name: name.trim(),
         email: email.trim().toLowerCase(),
+        username: '', // Will be set during onboarding
         avatar: null,
         age: null,
         gender: null,
@@ -305,6 +308,7 @@ export const useAuthProvider = () => {
         lifeScore: 0,
         avatarBadgeId: null,
         wantsIntegrations: false,
+        isRealNameVisible: false,
         wealth: {
           salary: 0,
           savings: 0,
@@ -375,6 +379,7 @@ export const useAuthProvider = () => {
           id: firebaseUser.uid,
           name: firebaseUser.displayName || '',
           email: firebaseUser.email || '',
+          username: '',
           avatar: firebaseUser.photoURL,
           age: undefined,
           gender: undefined,
@@ -400,6 +405,7 @@ export const useAuthProvider = () => {
           createdAt: new Date(),
           lastActive: new Date(),
           wantsIntegrations: false,
+          isRealNameVisible: false,
           role: 'user'
         };
       }
@@ -432,6 +438,7 @@ export const useAuthProvider = () => {
         id: userData.id,
         name: userData.name || '',
         email: userData.email || firebaseUser.email || '',
+        username: userData.username || '',
         avatar: userData.avatar || firebaseUser.photoURL,
         age: userData.age,
         gender: userData.gender,
@@ -458,6 +465,7 @@ export const useAuthProvider = () => {
         lastActive: new Date(),
         avatarBadge: userData.avatarBadgeId ? ALL_BADGES.find(b => b.id === userData.avatarBadgeId) : undefined,
         wantsIntegrations: userData.wantsIntegrations || false,
+        isRealNameVisible: userData.isRealNameVisible || false,
         role: userData.role || 'user'
       };
 
