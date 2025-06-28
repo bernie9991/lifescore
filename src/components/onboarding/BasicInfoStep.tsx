@@ -22,7 +22,21 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ data, onNext, onPrev, can
   ];
 
   const onSubmit = (formData: any) => {
-    onNext(formData);
+    // Clean the form data to ensure only serializable values are passed
+    const cleanedData = {
+      name: formData.name || '',
+      age: formData.age ? parseInt(formData.age, 10) : undefined,
+      gender: formData.gender || '',
+      country: formData.country || '',
+      city: formData.city || ''
+    };
+
+    // Remove any undefined values to keep the object clean
+    const finalData = Object.fromEntries(
+      Object.entries(cleanedData).filter(([_, value]) => value !== undefined && value !== '')
+    );
+
+    onNext(finalData);
   };
 
   return (
