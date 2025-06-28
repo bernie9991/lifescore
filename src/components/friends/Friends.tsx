@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Users, UserPlus, Mail, Search, Trophy, Crown, Medal, Award, Star, TrendingUp, Globe, MapPin, Zap, Heart, Laugh, Angry, Clapperboard as Clap } from 'lucide-react';
 import { User } from '../../types';
 import { formatNumber, formatCurrency, triggerEmojiConfetti } from '../../utils/animations';
-import { supabase } from '../../lib/supabase';
+import { getMockFriends } from '../../utils/mockData';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import UserProfileModal from '../modals/UserProfileModal';
@@ -45,7 +45,7 @@ const Friends: React.FC<FriendsProps> = ({ user }) => {
     { id: 'kudos', type: 'kudos', icon: Heart, label: 'Kudos', color: 'text-pink-400', bgColor: 'bg-pink-400/20 border-pink-400/40' }
   ];
 
-  // Load friends data from Supabase
+  // Load friends data using mock data
   useEffect(() => {
     loadFriendsData();
   }, [user.friends]);
@@ -54,53 +54,11 @@ const Friends: React.FC<FriendsProps> = ({ user }) => {
     try {
       setLoading(true);
       
-      if (!user.friends || user.friends.length === 0) {
-        setFriendsData([]);
-        setLoading(false);
-        return;
-      }
-
-      // Query friends from Supabase
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          name,
-          avatar_url,
-          country,
-          city,
-          life_score,
-          created_at
-        `)
-        .in('id', user.friends);
-
-      if (error) {
-        console.error('Error loading friends:', error);
-        setFriendsData([]);
-        return;
-      }
-
-      // Convert to User objects
-      const friendsUsers: User[] = (profiles || []).map(profile => ({
-        id: profile.id,
-        name: profile.name || 'Anonymous',
-        email: '', // Don't expose email
-        avatar: profile.avatar_url,
-        country: profile.country || '',
-        city: profile.city || '',
-        lifeScore: profile.life_score || 0,
-        wealth: { salary: 0, savings: 0, investments: 0, currency: 'USD', total: 0 },
-        knowledge: { education: '', certificates: [], languages: [], total: 0 },
-        assets: [],
-        badges: [],
-        friends: [],
-        createdAt: new Date(profile.created_at),
-        lastActive: new Date(),
-        status: 'online' // Mock status
-      }));
-
+      // Use mock data instead of Supabase
+      const mockFriends = getMockFriends();
+      
       // Add current user to the list for leaderboard
-      const allUsers = [...friendsUsers, user];
+      const allUsers = [...mockFriends, user];
       
       // Sort by LifeScore for leaderboard
       allUsers.sort((a, b) => b.lifeScore - a.lifeScore);
@@ -109,7 +67,7 @@ const Friends: React.FC<FriendsProps> = ({ user }) => {
       
     } catch (error) {
       console.error('Error loading friends data:', error);
-      setFriendsData([]);
+      setFriendsData([user]); // At least show current user
     } finally {
       setLoading(false);
     }

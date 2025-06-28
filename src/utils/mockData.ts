@@ -30,7 +30,8 @@ export const mockUser: User = {
   badges: [],
   friends: ['2', '3', '4'],
   createdAt: new Date('2024-01-15'),
-  lastActive: new Date()
+  lastActive: new Date(),
+  role: 'user'
 };
 
 export const mockBadges: Badge[] = [
@@ -93,6 +94,126 @@ export const mockBadges: Badge[] = [
     total: 1000000
   }
 ];
+
+// Mock friends data
+export const getMockFriends = (): User[] => {
+  return [
+    {
+      id: '2',
+      name: 'Sarah Chen',
+      email: 'sarah@example.com',
+      avatar: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=1',
+      age: 26,
+      gender: 'female',
+      country: 'Singapore',
+      city: 'Singapore',
+      lifeScore: 12500,
+      wealth: { salary: 150000, savings: 80000, investments: 120000, currency: 'SGD', total: 350000 },
+      knowledge: { education: 'Masters', certificates: ['Google Cloud', 'Scrum Master'], languages: ['English', 'Mandarin', 'Malay'], total: 3200 },
+      assets: [{ id: '1', type: 'home', name: 'Condo', value: 900000 }],
+      badges: [],
+      friends: ['1', '3'],
+      createdAt: new Date('2024-01-10'),
+      lastActive: new Date(),
+      role: 'user'
+    },
+    {
+      id: '3',
+      name: 'Marcus Williams',
+      email: 'marcus@example.com',
+      avatar: 'https://images.pexels.com/photos/1040880/pexels-photo-1040880.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=1',
+      age: 32,
+      gender: 'male',
+      country: 'Canada',
+      city: 'Toronto',
+      lifeScore: 11200,
+      wealth: { salary: 110000, savings: 60000, investments: 90000, currency: 'CAD', total: 260000 },
+      knowledge: { education: 'Bachelors', certificates: ['PMP', 'Six Sigma'], languages: ['English', 'French'], total: 2800 },
+      assets: [{ id: '1', type: 'car', name: 'BMW X5', value: 65000 }],
+      badges: [],
+      friends: ['1', '2'],
+      createdAt: new Date('2024-01-05'),
+      lastActive: new Date(),
+      role: 'user'
+    },
+    {
+      id: '4',
+      name: 'Elena Rodriguez',
+      email: 'elena@example.com',
+      avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=1',
+      age: 29,
+      gender: 'female',
+      country: 'Spain',
+      city: 'Madrid',
+      lifeScore: 10800,
+      wealth: { salary: 85000, savings: 40000, investments: 55000, currency: 'EUR', total: 180000 },
+      knowledge: { education: 'Masters', certificates: ['Adobe Certified', 'Google Analytics'], languages: ['Spanish', 'English', 'Portuguese', 'Italian'], total: 3000 },
+      assets: [{ id: '1', type: 'art', name: 'Art Collection', value: 25000 }],
+      badges: [],
+      friends: ['1'],
+      createdAt: new Date('2024-01-20'),
+      lastActive: new Date(),
+      role: 'user'
+    },
+    {
+      id: '5',
+      name: 'David Kim',
+      email: 'david@example.com',
+      avatar: 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=1',
+      age: 31,
+      gender: 'male',
+      country: 'South Korea',
+      city: 'Seoul',
+      lifeScore: 9500,
+      wealth: { salary: 95000, savings: 35000, investments: 45000, currency: 'KRW', total: 175000 },
+      knowledge: { education: 'Bachelors', certificates: ['AWS', 'Kubernetes'], languages: ['Korean', 'English', 'Japanese'], total: 2400 },
+      assets: [{ id: '1', type: 'car', name: 'Hyundai Genesis', value: 40000 }],
+      badges: [],
+      friends: [],
+      createdAt: new Date('2024-02-01'),
+      lastActive: new Date(),
+      role: 'user'
+    }
+  ];
+};
+
+// Mock leaderboard data
+export const getMockLeaderboard = (tab: string, currentUser: User): LeaderboardEntry[] => {
+  const mockUsers = getMockFriends();
+  const allUsers = [...mockUsers, currentUser];
+  
+  // Sort based on tab type
+  let sortedUsers = [...allUsers];
+  
+  switch (tab) {
+    case 'wealth':
+      sortedUsers.sort((a, b) => (b.wealth?.total || 0) - (a.wealth?.total || 0));
+      break;
+    case 'knowledge':
+      sortedUsers.sort((a, b) => (b.knowledge?.total || 0) - (a.knowledge?.total || 0));
+      break;
+    case 'local':
+      sortedUsers = sortedUsers.filter(u => u.country === currentUser.country);
+      sortedUsers.sort((a, b) => b.lifeScore - a.lifeScore);
+      break;
+    case 'friends':
+      sortedUsers = sortedUsers.filter(u => currentUser.friends?.includes(u.id) || u.id === currentUser.id);
+      sortedUsers.sort((a, b) => b.lifeScore - a.lifeScore);
+      break;
+    default: // global
+      sortedUsers.sort((a, b) => b.lifeScore - a.lifeScore);
+  }
+  
+  return sortedUsers.map((user, index) => ({
+    rank: index + 1,
+    user,
+    score: tab === 'wealth' ? (user.wealth?.total || 0) : 
+           tab === 'knowledge' ? (user.knowledge?.total || 0) : 
+           user.lifeScore,
+    change: Math.floor(Math.random() * 20) - 10, // Random change for demo
+    badge: mockBadges[Math.floor(Math.random() * mockBadges.length)]
+  }));
+};
 
 export const mockLeaderboard: LeaderboardEntry[] = [
   {

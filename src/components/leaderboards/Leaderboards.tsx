@@ -4,7 +4,7 @@ import { Globe, MapPin, Building, Users, Filter, Crown, Medal, Award, DollarSign
 import { User } from '../../types';
 import { formatNumber, formatCurrency, triggerConfetti } from '../../utils/animations';
 import { calculateLifeScore, estimateGlobalStanding } from '../../utils/lifeScoreEngine';
-import { supabase } from '../../lib/supabase';
+import { getMockLeaderboard } from '../../utils/mockData';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import UserProfileModal from '../modals/UserProfileModal';
@@ -45,7 +45,7 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
     { id: 'monthly', label: 'Monthly' },
   ];
 
-  // Load real leaderboard data from Supabase
+  // Load leaderboard data using mock data
   useEffect(() => {
     loadLeaderboardData();
   }, [activeTab, filter]);
@@ -54,63 +54,9 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
     try {
       setLoading(true);
       
-      // Query real users from Supabase
-      let query = supabase
-        .from('profiles')
-        .select(`
-          id,
-          name,
-          avatar_url,
-          country,
-          city,
-          life_score,
-          created_at
-        `)
-        .order('life_score', { ascending: false })
-        .limit(50);
-
-      // Apply filters based on active tab
-      if (activeTab === 'local') {
-        query = query.eq('country', user.country);
-      }
-
-      const { data: profiles, error } = await query;
-
-      if (error) {
-        console.error('Error loading leaderboard:', error);
-        setLeaderboardData([]);
-        return;
-      }
-
-      if (!profiles || profiles.length === 0) {
-        setLeaderboardData([]);
-        return;
-      }
-
-      // Convert to leaderboard entries
-      const entries: LeaderboardEntry[] = profiles.map((profile, index) => ({
-        rank: index + 1,
-        user: {
-          id: profile.id,
-          name: profile.name || 'Anonymous',
-          email: '', // Don't expose email
-          avatar: profile.avatar_url,
-          country: profile.country || '',
-          city: profile.city || '',
-          lifeScore: profile.life_score || 0,
-          wealth: { salary: 0, savings: 0, investments: 0, currency: 'USD', total: 0 },
-          knowledge: { education: '', certificates: [], languages: [], total: 0 },
-          assets: [],
-          badges: [],
-          friends: [],
-          createdAt: new Date(profile.created_at),
-          lastActive: new Date()
-        },
-        score: profile.life_score || 0,
-        change: Math.floor(Math.random() * 20) - 10, // Random change for demo
-      }));
-
-      setLeaderboardData(entries);
+      // Use mock data instead of Supabase
+      const mockData = getMockLeaderboard(activeTab, user);
+      setLeaderboardData(mockData);
       
     } catch (error) {
       console.error('Error loading leaderboard data:', error);
