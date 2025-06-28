@@ -25,16 +25,14 @@ const AppContent: React.FC = () => {
         <Route 
           path="/" 
           element={
-            isAuthenticated ? (
-              isAdmin ? (
-                <Navigate to="/admin" replace />
-              ) : needsOnboarding ? (
-                <Navigate to="/onboarding" replace />
-              ) : (
-                <Navigate to="/dashboard" replace />
-              )
-            ) : (
+            !isAuthenticated ? (
               <HomePage />
+            ) : isAdmin ? (
+              <Navigate to="/admin" replace />
+            ) : needsOnboarding ? (
+              <Navigate to="/onboarding" replace />
+            ) : (
+              <MainAppLayout />
             )
           } 
         />
@@ -47,22 +45,7 @@ const AppContent: React.FC = () => {
             ) : isAuthenticated && isAdmin ? (
               <Navigate to="/admin" replace />
             ) : isAuthenticated ? (
-              <Navigate to="/dashboard" replace />
-            ) : (
               <Navigate to="/" replace />
-            )
-          } 
-        />
-        
-        <Route 
-          path="/dashboard" 
-          element={
-            isAuthenticated && !isAdmin && !needsOnboarding ? (
-              <MainAppLayout />
-            ) : isAuthenticated && isAdmin ? (
-              <Navigate to="/admin" replace />
-            ) : isAuthenticated && needsOnboarding ? (
-              <Navigate to="/onboarding" replace />
             ) : (
               <Navigate to="/" replace />
             )
@@ -78,7 +61,7 @@ const AppContent: React.FC = () => {
               needsOnboarding ? (
                 <Navigate to="/onboarding" replace />
               ) : (
-                <Navigate to="/dashboard" replace />
+                <Navigate to="/" replace />
               )
             ) : (
               <Navigate to="/" replace />
@@ -86,6 +69,7 @@ const AppContent: React.FC = () => {
           } 
         />
 
+        {/* Catch all route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       
