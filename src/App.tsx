@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { AuthContext, useAuthProvider } from './hooks/useAuth';
+import { useAuth } from './hooks/useAuth';
 import HomePage from './pages/HomePage';
 import OnboardingFlow from './components/onboarding/OnboardingFlow';
 import MainAppLayout from './components/layout/MainAppLayout';
@@ -9,7 +9,7 @@ import AdminPanel from './components/admin/AdminPanel';
 import BadgeUnlockModal from './components/badges/BadgeUnlockModal';
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated, isAdmin, newlyUnlockedBadges, clearNewBadges, user } = useAuthProvider();
+  const { isAuthenticated, isAdmin, newlyUnlockedBadges, clearNewBadges, user } = useAuth();
 
   // Check if user needs onboarding (incomplete profile)
   const needsOnboarding = user && (
@@ -25,14 +25,16 @@ const AppContent: React.FC = () => {
         <Route 
           path="/" 
           element={
-            !isAuthenticated ? (
-              <HomePage />
-            ) : isAdmin ? (
-              <Navigate to="/admin" replace />
-            ) : needsOnboarding ? (
-              <Navigate to="/onboarding" replace />
+            isAuthenticated ? (
+              isAdmin ? (
+                <Navigate to="/admin" replace />
+              ) : needsOnboarding ? (
+                <Navigate to="/onboarding" replace />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
             ) : (
-              <MainAppLayout />
+              <HomePage />
             )
           } 
         />
@@ -45,7 +47,22 @@ const AppContent: React.FC = () => {
             ) : isAuthenticated && isAdmin ? (
               <Navigate to="/admin" replace />
             ) : isAuthenticated ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
               <Navigate to="/" replace />
+            )
+          } 
+        />
+        
+        <Route 
+          path="/dashboard" 
+          element={
+            isAuthenticated && !isAdmin && !needsOnboarding ? (
+              <MainAppLayout />
+            ) : isAuthenticated && isAdmin ? (
+              <Navigate to="/admin" replace />
+            ) : isAuthenticated && needsOnboarding ? (
+              <Navigate to="/onboarding" replace />
             ) : (
               <Navigate to="/" replace />
             )
@@ -61,7 +78,7 @@ const AppContent: React.FC = () => {
               needsOnboarding ? (
                 <Navigate to="/onboarding" replace />
               ) : (
-                <Navigate to="/" replace />
+                <Navigate to="/dashboard" replace />
               )
             ) : (
               <Navigate to="/" replace />
@@ -69,7 +86,6 @@ const AppContent: React.FC = () => {
           } 
         />
 
-        {/* Catch all route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       
@@ -99,14 +115,10 @@ const AppContent: React.FC = () => {
 };
 
 function App() {
-  const authValue = useAuthProvider();
-
   return (
-    <AuthContext.Provider value={authValue}>
-      <Router>
-        <AppContent />
-      </Router>
-    </AuthContext.Provider>
+    <Router>
+      <AppContent />
+    </Router>
   );
 }
 
