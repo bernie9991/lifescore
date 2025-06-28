@@ -44,6 +44,8 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('profile');
   const [showIntegrationsModal, setShowIntegrationsModal] = useState(false);
+  const [showAddLanguageModal, setShowAddLanguageModal] = useState(false);
+  const [newLanguage, setNewLanguage] = useState('');
   const [editData, setEditData] = useState({
     name: user?.name || '',
     city: user?.city || '',
@@ -150,17 +152,18 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
   };
 
   const handleAddLanguage = () => {
-    const language = prompt('Enter a new language:');
-    if (language && language.trim()) {
+    if (newLanguage && newLanguage.trim()) {
       const currentKnowledge = user.knowledge || { education: '', certificates: [], languages: [], total: 0 };
-      if (!currentKnowledge.languages.includes(language.trim())) {
+      if (!currentKnowledge.languages.includes(newLanguage.trim())) {
         const updatedKnowledge = {
           ...currentKnowledge,
-          languages: [...currentKnowledge.languages, language.trim()],
+          languages: [...currentKnowledge.languages, newLanguage.trim()],
           total: currentKnowledge.total + 50 // Add 50 XP per language
         };
         updateUser({ knowledge: updatedKnowledge });
-        toast.success(`Added ${language}! +50 XP`);
+        toast.success(`Added ${newLanguage}! +50 XP`);
+        setNewLanguage('');
+        setShowAddLanguageModal(false);
       } else {
         toast.error('Language already added!');
       }
@@ -608,31 +611,12 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
               ))}
             </div>
 
-            {/* Notification Status */}
-            {user.wantsIntegrations ? (
-              <div className="p-4 bg-green-500/10 border border-green-400/30 rounded-lg">
-                <div className="flex items-center space-x-2 text-green-400">
-                  <Star className="w-5 h-5" />
-                  <span className="font-semibold">You'll be notified when integrations launch!</span>
-                </div>
-                <p className="text-green-300 text-sm mt-1">
-                  Be among the first to connect your apps and earn bonus XP.
-                </p>
-              </div>
-            ) : (
-              <div className="text-center">
-                <Button
-                  onClick={() => setShowIntegrationsModal(true)}
-                  className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
-                  icon={Plus}
-                >
-                  🔔 Notify Me When Available
-                </Button>
-                <p className="text-gray-400 text-sm mt-2">
-                  Get early access when integrations go live
-                </p>
-              </div>
-            )}
+            {/* Simple info text without notification option */}
+            <div className="text-center">
+              <p className="text-gray-400 text-sm">
+                Integrations will be available in a future update. Connect your favorite apps to automatically earn XP and unlock special badges.
+              </p>
+            </div>
           </Card>
 
           {/* Detailed Sections */}
@@ -644,7 +628,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
                   <Globe className="w-5 h-5 text-blue-400 mr-2" />
                   Languages
                 </h3>
-                <Button variant="ghost" size="sm" icon={Plus} onClick={handleAddLanguage}>
+                <Button variant="ghost" size="sm" icon={Plus} onClick={() => setShowAddLanguageModal(true)}>
                   Add
                 </Button>
               </div>
@@ -773,6 +757,67 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
             onNotifyMe={handleNotifyMeIntegrations}
             hasNotified={user.wantsIntegrations}
           />
+
+          {/* Add Language Modal */}
+          {showAddLanguageModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              {/* Backdrop */}
+              <div 
+                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                onClick={() => setShowAddLanguageModal(false)}
+              />
+
+              {/* Modal */}
+              <div className="relative bg-gray-800 rounded-2xl border border-gray-700 p-6 w-full max-w-md">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-white">Add Language</h2>
+                  <button
+                    onClick={() => setShowAddLanguageModal(false)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Language Name
+                    </label>
+                    <input
+                      type="text"
+                      value={newLanguage}
+                      onChange={(e) => setNewLanguage(e.target.value)}
+                      placeholder="e.g., Spanish, French, Mandarin"
+                      className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddLanguage()}
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex space-x-3 pt-4">
+                    <Button
+                      variant="secondary"
+                      onClick={() => setShowAddLanguageModal(false)}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleAddLanguage}
+                      className="flex-1"
+                      disabled={!newLanguage.trim()}
+                    >
+                      Add Language
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 
