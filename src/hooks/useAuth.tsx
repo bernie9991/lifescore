@@ -681,6 +681,7 @@ export const useAuthProvider = () => {
   }, [handleAuthError, loadUserData]);
 
   const updateUser = useCallback(async (userData: Partial<User>) => {
+    // If user is null, there's nothing to update for Firestore
     if (!user) {
       authLogger.error('No user to update');
       return;
@@ -689,82 +690,78 @@ export const useAuthProvider = () => {
     try {
       authLogger.debug('Updating user', userData);
       
+      // Create an updated user object for local calculations (LifeScore, badges)
       const updatedUser = { ...user, ...userData };
-      const userWithScore = updateUserLifeScore(updatedUser);
+      const userWithScore = updateUserLifeScore(updatedUser); // Assuming this updates lifeScore correctly
       
       authLogger.debug('Checking for badge unlocks...');
-      const newBadges = checkBadgeUnlocks(userWithScore, user);
+      const newBadges = checkBadgeUnlocks(userWithScore, user); // Checks for newly unlocked badges
       
+      // Determine the user ID for Firestore operations.
+      // Prioritize user.id from state, but fallback to auth.currentUser.uid from Firebase Auth SDK
+      // if user.id is somehow undefined (which the error indicates might be happening).
+      const currentUserId = user.id || auth.currentUser?.uid;
+
+      if (!currentUserId) {
+        // This is a critical error: we can't save/update user data without a valid ID.
+        authLogger.error('Cannot update user profile or save badges: User ID is undefined.', { userState: user, authCurrentUser: auth.currentUser });
+        toast.error('Failed to update profile: User data missing.');
+        return; // Stop execution if we don't have a user ID
+      }
+
+      // --- NEW, CLEANED BADGE SAVING LOGIC ---
       if (newBadges.length > 0) {
-        authLogger.info('New badges unlocked', { badges: newBadges.map(b => b.name) });
+        authLogger.info('New badges unlocked', { badges: newBadges.map(b => b.name), userId: currentUserId });
+        // Add new badges to the user's local state immediately for display
         userWithScore.badges = [...(userWithScore.badges || []), ...newBadges];
         
-        // Save new badges to Firestore
+        // Save each newly unlocked badge to the 'userBadges' collection in Firestore
         const badgesCollection = collection(db, 'userBadges');
-              if (newBadges.length > 0) {
-        authLogger.debug('Attempting to save new badges. Current user object:', user); // Add this line
-        authLogger.debug('User ID for badges:', user?.id); // Add this line - using optional chaining for safety
-        
+        for (const badge of newBadges) {
+          await addDoc(badgesCollection, {
+            userId: currentUserId, // <--- Use the robustly determined user ID here
+            badgeId: badge.id,
+            unlockedAt: serverTimestamp() // Use Firestore server timestamp
+          });
+        }
+        // Update newlyUnlockedBadges state for UI display
         setNewlyUnlockedBadges(newBadges);
         toast.success(`🎉 ${newBadges.length} new badge${newBadges.length > 1 ? 's' : ''} unlocked!`);
-
-        // Save new badges to Firestore
-        const badgesCollection = collection(db, 'userBadges');
-        for (const badge of newBadges) {
-          await addDoc(badgesCollection, {
-            userId: user.id, // This line is currently failing
-            badgeId: badge.id,
-            unlockedAt: serverTimestamp()
-          });
-        }
       }
+      // --- END NEW, CLEANED BADGE SAVING LOGIC ---
 
-        for (const badge of newBadges) {
-          await addDoc(badgesCollection, {
-            userId: user.id,
-            badgeId: badge.id,
-            unlockedAt: serverTimestamp()
-          });
-        }
-      }
-      
+      // Update user's local state (after badges are processed)
       setUser(userWithScore);
       
-      // Don't try to save admin user data to Firebase
+      // Admin users don't save their profile to the main 'users' collection
       if (isAdmin) {
-        authLogger.info('Admin user - skipping database save');
-        if (newBadges.length > 0) {
-          setNewlyUnlockedBadges(newBadges);
-          toast.success(`🎉 ${newBadges.length} new badge${newBadges.length > 1 ? 's' : ''} unlocked!`);
-        }
-        return;
+        authLogger.info('Admin user - skipping main user profile database save');
+        return; // Admin user profile updates are handled differently/locally
       }
       
-      // Save to Firestore for real users
-      const userDocRef = doc(db, 'users', user.id);
+      // Save updated user data to Firestore for real users
+      const userDocRef = doc(db, 'users', currentUserId); // Use the robustly determined user ID here too
       const updateData = {
+        // Spread the new form data
         ...userData,
+        // Override with calculated lifeScore and server timestamp for last active
         lifeScore: userWithScore.lifeScore,
         lastActive: serverTimestamp()
       };
       
+      // Use setDoc with merge: true for robust updates (creates if not exists, merges if exists)
       await setDoc(userDocRef, updateData, { merge: true });
-      authLogger.info('User data updated in Firestore');
+      authLogger.info('User data updated in Firestore', { userId: currentUserId });
       
-      if (newBadges.length > 0) {
-        setNewlyUnlockedBadges(newBadges);
-        toast.success(`🎉 ${newBadges.length} new badge${newBadges.length > 1 ? 's' : ''} unlocked!`);
-      }
     } catch (error) {
+      // Centralized error handling
       handleAuthError(error, 'User update');
       toast.error('Failed to update profile');
     }
-  }, [handleAuthError, user, isAdmin]);
+  }, [handleAuthError, user, isAdmin, db, auth.currentUser]); // Added db, auth.currentUser to dependencies for useCallback
 
-  const clearNewBadges = () => {
-    authLogger.debug('Clearing newly unlocked badges');
-    setNewlyUnlockedBadges([]);
-  };
+  // ... rest of useAuth hook ...
+
 
   return {
     user,
