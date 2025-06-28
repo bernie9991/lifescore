@@ -730,7 +730,7 @@ export const useAuthProvider = () => {
         lastActive: serverTimestamp()
       };
       
-      await updateDoc(userDocRef, updateData);
+      await setDoc(userDocRef, updateData, { merge: true });
       authLogger.info('User data updated in Firestore');
       
       if (newBadges.length > 0) {
