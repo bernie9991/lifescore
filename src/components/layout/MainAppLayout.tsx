@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import Sidebar from '../navigation/Sidebar';
 import BottomTabBar from '../navigation/BottomTabBar';
-import DashboardHome from '../dashboard/DashboardHome';
+import Dashboard from '../dashboard/Dashboard';
 import Feed from '../feed/Feed';
 import QuestsAndMissions from '../quests/QuestsAndMissions';
 import Leaderboards from '../leaderboards/Leaderboards';
@@ -29,7 +29,7 @@ const MainAppLayout: React.FC = () => {
     switch (currentPage) {
       case 'dashboard':
         return (
-          <DashboardHome 
+          <Dashboard 
             user={user} 
             onProfileClick={() => setCurrentPage('profile')}
             onSettingsClick={() => setCurrentPage('profile')}
@@ -47,7 +47,7 @@ const MainAppLayout: React.FC = () => {
         return <Profile user={user} />;
       default:
         return (
-          <DashboardHome 
+          <Dashboard 
             user={user} 
             onProfileClick={() => setCurrentPage('profile')}
             onSettingsClick={() => setCurrentPage('profile')}
