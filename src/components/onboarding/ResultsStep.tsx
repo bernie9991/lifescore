@@ -32,11 +32,12 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ data, onNext }) => {
       setShowResults(true);
       triggerConfetti();
       
-      // Create complete user data with LifeScore but no badges
-      // Badges will be determined by the useAuth hook
+      // Create complete user data with LifeScore and username set to a value (not null)
+      // This will prevent the onboarding from triggering again
       const completeUserData = {
         ...data,
-        lifeScore
+        lifeScore,
+        username: data.name?.toLowerCase().replace(/\s+/g, '') + Math.floor(Math.random() * 1000) // Generate a default username
       };
       
       // Pass the complete data to parent
@@ -46,14 +47,10 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ data, onNext }) => {
     return () => clearTimeout(timer);
   }, [data, lifeScore, onNext]);
 
-const handleComplete = () => {
-  // *** CRITICAL CHANGE HERE: Set the completion flag BEFORE navigating ***
-  localStorage.setItem('lifescore_onboarding_complete', 'true');
-
-  // Navigate to dashboard
-  navigate('/dashboard');
-};
-
+  const handleComplete = () => {
+    // Navigate to dashboard - onboarding is now complete
+    navigate('/dashboard');
+  };
 
   if (!showResults) {
     return (

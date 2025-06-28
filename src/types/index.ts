@@ -1,8 +1,8 @@
 export interface User {
   id: string;
+  uid?: string; // Add uid field for compatibility
   name: string;
   email: string;
-  username: string;
   avatar?: string;
   avatarBadge?: Badge;
   age?: number;
@@ -10,6 +10,7 @@ export interface User {
   country: string;
   city: string;
   lifeScore: number;
+  username?: string | null; // Add username field for onboarding check
   wealth: WealthData;
   knowledge: KnowledgeData;
   assets: Asset[];
@@ -19,7 +20,6 @@ export interface User {
   lastActive: Date;
   scoreBreakdown?: any;
   wantsIntegrations?: boolean;
-  isRealNameVisible: boolean;
   role: string;
 }
 
