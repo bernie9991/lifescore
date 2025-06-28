@@ -43,6 +43,7 @@ const RankingCards: React.FC<RankingCardsProps> = ({ user }) => {
 
   const rankings = [
     {
+      id: 'global',
       title: 'Global Rank',
       rank: globalRank,
       total: '8B',
@@ -53,6 +54,7 @@ const RankingCards: React.FC<RankingCardsProps> = ({ user }) => {
       changeType: 'up' as const
     },
     {
+      id: 'country',
       title: `${user.country}`,
       rank: countryRank,
       total: formatNumber(countryPopulation),
@@ -63,6 +65,7 @@ const RankingCards: React.FC<RankingCardsProps> = ({ user }) => {
       changeType: 'up' as const
     },
     {
+      id: 'city',
       title: user.city,
       rank: cityRank,
       total: formatNumber(Math.floor(countryPopulation * 0.1)),
@@ -73,6 +76,7 @@ const RankingCards: React.FC<RankingCardsProps> = ({ user }) => {
       changeType: Math.random() > 0.5 ? 'up' as const : 'down' as const
     },
     {
+      id: 'friends',
       title: 'Friends',
       rank: Math.min((user.friends?.length || 0) + 1, 12), // User's position among friends
       total: Math.max((user.friends?.length || 0) + 1, 12).toString(),
@@ -88,7 +92,7 @@ const RankingCards: React.FC<RankingCardsProps> = ({ user }) => {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {rankings.map((ranking, index) => (
         <motion.div
-          key={ranking.title}
+          key={ranking.id}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: index * 0.1 }}
