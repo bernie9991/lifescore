@@ -701,6 +701,24 @@ export const useAuthProvider = () => {
         
         // Save new badges to Firestore
         const badgesCollection = collection(db, 'userBadges');
+              if (newBadges.length > 0) {
+        authLogger.debug('Attempting to save new badges. Current user object:', user); // Add this line
+        authLogger.debug('User ID for badges:', user?.id); // Add this line - using optional chaining for safety
+        
+        setNewlyUnlockedBadges(newBadges);
+        toast.success(`🎉 ${newBadges.length} new badge${newBadges.length > 1 ? 's' : ''} unlocked!`);
+
+        // Save new badges to Firestore
+        const badgesCollection = collection(db, 'userBadges');
+        for (const badge of newBadges) {
+          await addDoc(badgesCollection, {
+            userId: user.id, // This line is currently failing
+            badgeId: badge.id,
+            unlockedAt: serverTimestamp()
+          });
+        }
+      }
+
         for (const badge of newBadges) {
           await addDoc(badgesCollection, {
             userId: user.id,
