@@ -178,6 +178,20 @@ export const useAuthProvider = () => {
         originalError: error,
         timestamp: new Date()
       };
+    } else if (error.message?.includes('email_address_invalid')) {
+      authError = {
+        type: AuthErrorType.VALIDATION_ERROR,
+        message: 'Please enter a valid email address with a proper domain (e.g., user@example.com).',
+        originalError: error,
+        timestamp: new Date()
+      };
+    } else if (error.message?.includes('row-level security policy')) {
+      authError = {
+        type: AuthErrorType.DATABASE_ERROR,
+        message: 'Account creation failed due to security settings. Please try again or contact support.',
+        originalError: error,
+        timestamp: new Date()
+      };
     } else {
       authError = {
         type: AuthErrorType.UNKNOWN_ERROR,
@@ -231,7 +245,7 @@ export const useAuthProvider = () => {
     role: 'admin'
   });
 
-  // Enhanced user data initialization with better error handling
+  // Enhanced user data initialization with better error handling and RLS compliance
   const initializeUserData = async (userId: string, name: string, email: string) => {
     authLogger.info('Initializing user data', { userId, name, email });
     
@@ -246,6 +260,18 @@ export const useAuthProvider = () => {
       if (!emailValidation) {
         throw new Error('Invalid email format');
       }
+
+      // Wait a moment to ensure the user session is fully established
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Verify we have a valid session before proceeding
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        authLogger.error('No valid session found during user data initialization', sessionError);
+        throw new Error('Authentication session not found. Please try signing up again.');
+      }
+
+      authLogger.debug('Valid session confirmed, proceeding with data initialization');
 
       // 1. Create profile with enhanced error handling
       authLogger.debug('Creating profile...');
