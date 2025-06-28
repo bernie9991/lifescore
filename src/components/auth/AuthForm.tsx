@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Mail, Lock, User, Sparkles, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Sparkles, AlertCircle, CheckCircle, X, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { supabase } from '../../lib/supabase';
 import Button from '../common/Button';
 import toast from 'react-hot-toast';
 
@@ -26,6 +27,9 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isResendingEmail, setIsResendingEmail] = useState(false);
+  const [showResendOption, setShowResendOption] = useState(false);
+  const [emailForResend, setEmailForResend] = useState('');
   const { login, signup, loading, lastError, clearError } = useAuth();
 
   const loginForm = useForm<LoginFormData>();
@@ -34,11 +38,20 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
   const onLoginSubmit = async (data: LoginFormData) => {
     try {
       clearError();
+      setShowResendOption(false);
       await login(data.email, data.password);
       toast.success('Welcome back! 🎉');
       onSuccess?.();
     } catch (error: any) {
       console.error('Login error:', error);
+      
+      // Check if it's an email confirmation error
+      if (error.message?.includes('Email not confirmed') || 
+          error.originalError?.message?.includes('email_not_confirmed')) {
+        setEmailForResend(data.email);
+        setShowResendOption(true);
+      }
+      
       // Error is already handled by useAuth and displayed via lastError
       if (!lastError) {
         toast.error(error.message || 'Login failed. Please try again.');
@@ -54,6 +67,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
 
     try {
       clearError();
+      setShowResendOption(false);
       await signup(data.email, data.password, data.name);
       toast.success('Account created successfully! 🎉');
       onSuccess?.();
@@ -66,12 +80,42 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
     }
   };
 
+  const handleResendConfirmation = async () => {
+    if (!emailForResend) {
+      toast.error('Please enter your email address first');
+      return;
+    }
+
+    try {
+      setIsResendingEmail(true);
+      
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: emailForResend,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success('Confirmation email sent! Please check your inbox and spam folder.');
+      setShowResendOption(false);
+    } catch (error: any) {
+      console.error('Resend confirmation error:', error);
+      toast.error(error.message || 'Failed to resend confirmation email. Please try again.');
+    } finally {
+      setIsResendingEmail(false);
+    }
+  };
+
   const toggleMode = () => {
     setIsLogin(!isLogin);
     loginForm.reset();
     signupForm.reset();
     setShowPassword(false);
     setShowConfirmPassword(false);
+    setShowResendOption(false);
+    setEmailForResend('');
     clearError();
   };
 
@@ -112,13 +156,19 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
             className="mb-6 p-4 bg-red-900/20 border border-red-500/30 rounded-lg flex items-start space-x-3"
           >
             <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-            <div>
+            <div className="flex-1">
               <p className="text-red-300 text-sm font-medium">
                 {lastError.message}
               </p>
               {lastError.type === 'TIMEOUT_ERROR' && (
                 <p className="text-red-400 text-xs mt-1">
                   Check your internet connection and try again.
+                </p>
+              )}
+              {(lastError.message?.includes('Email not confirmed') || 
+                lastError.message?.includes('check your email')) && (
+                <p className="text-red-400 text-xs mt-1">
+                  Please check your email inbox and spam folder for the confirmation link.
                 </p>
               )}
             </div>
@@ -128,6 +178,50 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
             >
               <X className="w-4 h-4" />
             </button>
+          </motion.div>
+        )}
+
+        {/* Resend Confirmation Email Option */}
+        {showResendOption && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg"
+          >
+            <div className="flex items-start space-x-3">
+              <Mail className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-blue-300 text-sm font-medium mb-2">
+                  Need a new confirmation email?
+                </p>
+                <p className="text-blue-400 text-xs mb-3">
+                  We can resend the confirmation email to {emailForResend}
+                </p>
+                <button
+                  onClick={handleResendConfirmation}
+                  disabled={isResendingEmail}
+                  className="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white text-xs font-medium rounded-md transition-colors"
+                >
+                  {isResendingEmail ? (
+                    <>
+                      <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin mr-2" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-3 h-3 mr-2" />
+                      Resend Email
+                    </>
+                  )}
+                </button>
+              </div>
+              <button
+                onClick={() => setShowResendOption(false)}
+                className="text-blue-400 hover:text-blue-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </motion.div>
         )}
 
@@ -160,6 +254,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
                   placeholder="Enter your email"
                   className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   disabled={loading}
+                  onChange={(e) => {
+                    loginForm.setValue('email', e.target.value);
+                    setEmailForResend(e.target.value);
+                  }}
                 />
               </div>
               {loginForm.formState.errors.email && (
