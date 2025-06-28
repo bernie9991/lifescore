@@ -11,7 +11,7 @@ const TIMEOUT_CONFIG = {
   AUTH_OPERATIONS: 60000,     // 60 seconds for auth operations
   DATABASE_QUERIES: 60000,    // 60 seconds for database queries (increased from 40000ms)
   USER_CREATION: 60000,       // 60 seconds for user creation
-  SESSION_CHECK: 30000        // 30 seconds for session checks (increased from 20000ms)
+  SESSION_CHECK: 60000        // 60 seconds for session checks (increased from 30000ms)
 };
 
 // Enhanced error types for better error handling
