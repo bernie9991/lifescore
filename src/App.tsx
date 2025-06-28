@@ -11,8 +11,12 @@ import BadgeUnlockModal from './components/badges/BadgeUnlockModal';
 const AppContent: React.FC = () => {
   const { isAuthenticated, isAdmin, newlyUnlockedBadges, clearNewBadges, user } = useAuth();
 
+  // Check if onboarding has been completed via localStorage
+  const onboardingComplete = localStorage.getItem('lifescore_onboarding_complete') === 'true';
+
   // Check if user needs onboarding (incomplete profile)
-  const needsOnboarding = user && (
+  // Only check this if onboarding hasn't been marked as complete
+  const needsOnboarding = !onboardingComplete && user && (
     !user.name || 
     !user.country || 
     !user.city || 
