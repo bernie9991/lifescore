@@ -15,7 +15,9 @@ import {
   collection, 
   query, 
   where, 
-  getDocs 
+  getDocs,
+  addDoc,
+  serverTimestamp
 } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { User } from '../types';
@@ -25,10 +27,10 @@ import toast from 'react-hot-toast';
 
 // Enhanced timeout configuration
 const TIMEOUT_CONFIG = {
-  AUTH_OPERATIONS: 30000,     // 30 seconds for auth operations
-  DATABASE_QUERIES: 20000,    // 20 seconds for database queries
-  USER_CREATION: 30000,       // 30 seconds for user creation
-  SESSION_CHECK: 10000        // 10 seconds for session checks
+  AUTH_OPERATIONS: 15000,     // 15 seconds for auth operations
+  DATABASE_QUERIES: 10000,    // 10 seconds for database queries
+  USER_CREATION: 20000,       // 20 seconds for user creation
+  SESSION_CHECK: 5000         // 5 seconds for session checks
 };
 
 // Enhanced error types for better error handling
@@ -76,17 +78,17 @@ export const useAuth = () => {
 // Enhanced logging utility
 const authLogger = {
   info: (message: string, data?: any) => {
-    console.log(`🔐 AUTH INFO: ${message}`, data || '');
+    console.log(`🔥 FIREBASE AUTH: ${message}`, data || '');
   },
   error: (message: string, error?: any) => {
-    console.error(`❌ AUTH ERROR: ${message}`, error || '');
+    console.error(`❌ FIREBASE ERROR: ${message}`, error || '');
   },
   warn: (message: string, data?: any) => {
-    console.warn(`⚠️ AUTH WARNING: ${message}`, data || '');
+    console.warn(`⚠️ FIREBASE WARNING: ${message}`, data || '');
   },
   debug: (message: string, data?: any) => {
     if (import.meta.env.DEV) {
-      console.debug(`🔍 AUTH DEBUG: ${message}`, data || '');
+      console.debug(`🔍 FIREBASE DEBUG: ${message}`, data || '');
     }
   }
 };
@@ -101,7 +103,7 @@ const withTimeout = <T,>(
     setTimeout(() => {
       const error: AuthError = {
         type: AuthErrorType.TIMEOUT_ERROR,
-        message: `${operation} timed out after ${timeoutMs}ms`,
+        message: `${operation} timed out after ${timeoutMs}ms. Please check your connection.`,
         timestamp: new Date()
       };
       reject(error);
@@ -167,7 +169,7 @@ export const useAuthProvider = () => {
     if (error.type) {
       // Already an AuthError
       authError = error;
-    } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+    } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
       authError = {
         type: AuthErrorType.AUTH_ERROR,
         message: 'Invalid email or password. Please check your credentials and try again.',
@@ -184,7 +186,7 @@ export const useAuthProvider = () => {
     } else if (error.code === 'auth/weak-password') {
       authError = {
         type: AuthErrorType.VALIDATION_ERROR,
-        message: 'Password is too weak. Please choose a stronger password.',
+        message: 'Password is too weak. Please choose a stronger password (at least 6 characters).',
         originalError: error,
         timestamp: new Date()
       };
@@ -198,7 +200,14 @@ export const useAuthProvider = () => {
     } else if (error.code === 'auth/network-request-failed') {
       authError = {
         type: AuthErrorType.NETWORK_ERROR,
-        message: 'Network error. Please check your connection and try again.',
+        message: 'Network error. Please check your internet connection and try again.',
+        originalError: error,
+        timestamp: new Date()
+      };
+    } else if (error.code === 'auth/too-many-requests') {
+      authError = {
+        type: AuthErrorType.AUTH_ERROR,
+        message: 'Too many failed attempts. Please wait a moment and try again.',
         originalError: error,
         timestamp: new Date()
       };
@@ -307,8 +316,8 @@ export const useAuthProvider = () => {
         },
         assets: [],
         friends: [],
-        createdAt: new Date(),
-        lastActive: new Date(),
+        createdAt: serverTimestamp(),
+        lastActive: serverTimestamp(),
         role: 'user'
       };
 
@@ -318,21 +327,24 @@ export const useAuthProvider = () => {
         'user profile creation'
       );
 
+      authLogger.info('User profile created successfully');
+
       // Create starter badges
       const starterBadges = [
-        { userId, badgeId: 'welcome-aboard', unlockedAt: new Date() },
-        { userId, badgeId: 'profile-complete', unlockedAt: new Date() }
+        { userId, badgeId: 'welcome-aboard', unlockedAt: serverTimestamp() },
+        { userId, badgeId: 'profile-complete', unlockedAt: serverTimestamp() }
       ];
 
       const badgesCollection = collection(db, 'userBadges');
       for (const badge of starterBadges) {
         await withTimeout(
-          setDoc(doc(badgesCollection), badge),
+          addDoc(badgesCollection, badge),
           TIMEOUT_CONFIG.DATABASE_QUERIES,
           'starter badge creation'
         );
       }
 
+      authLogger.info('Starter badges created successfully');
       authLogger.info('User data initialization complete');
       return true;
     } catch (error) {
@@ -494,20 +506,21 @@ export const useAuthProvider = () => {
   useEffect(() => {
     let isMounted = true;
 
+    authLogger.info('Initializing Firebase authentication...');
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!isMounted) return;
 
       try {
-        setLoading(true);
-        
         if (firebaseUser) {
-          authLogger.info('Firebase user authenticated', { userId: firebaseUser.uid });
+          authLogger.info('Firebase user authenticated', { userId: firebaseUser.uid, email: firebaseUser.email });
           const userData = await loadUserData(firebaseUser);
           
           if (userData && isMounted) {
             setUser(userData);
             setIsAuthenticated(true);
             clearError();
+            authLogger.info('User state updated successfully');
           }
         } else {
           authLogger.info('No Firebase user found');
@@ -568,24 +581,25 @@ export const useAuthProvider = () => {
       }
 
       // Regular user login with Firebase
+      authLogger.info('Attempting Firebase authentication...');
       const userCredential = await withTimeout(
         signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password),
         TIMEOUT_CONFIG.AUTH_OPERATIONS,
-        'user login'
+        'Firebase login'
       );
 
       if (userCredential.user) {
-        authLogger.info('Login successful', { userId: userCredential.user.uid });
-        setLoading(false);
+        authLogger.info('Firebase login successful', { userId: userCredential.user.uid });
+        // Auth state change will handle the rest
         return;
       }
 
-      setLoading(false);
       throw new Error('Login failed - no user returned');
     } catch (error) {
       const authError = handleAuthError(error, 'Login');
-      setLoading(false);
       throw authError;
+    } finally {
+      setLoading(false);
     }
   }, [handleAuthError]);
 
@@ -611,27 +625,31 @@ export const useAuthProvider = () => {
       }
       
       // Step 1: Create Firebase auth user
+      authLogger.info('Creating Firebase user...');
       const userCredential = await withTimeout(
         createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password),
         TIMEOUT_CONFIG.AUTH_OPERATIONS,
-        'user signup'
+        'Firebase user creation'
       );
 
       if (!userCredential.user) {
         throw new Error('Signup failed - no user returned');
       }
 
+      authLogger.info('Firebase user created successfully', { userId: userCredential.user.uid });
+
       // Step 2: Update Firebase user profile
+      authLogger.info('Updating Firebase user profile...');
       await updateProfile(userCredential.user, {
         displayName: name.trim()
       });
 
-      authLogger.info('Firebase user created', { userId: userCredential.user.uid });
-
       // Step 3: Initialize user data in Firestore
+      authLogger.info('Initializing user data in Firestore...');
       await initializeUserData(userCredential.user.uid, name.trim(), email.trim().toLowerCase());
 
       // Step 4: Load complete user data
+      authLogger.info('Loading complete user data...');
       const userData = await loadUserData(userCredential.user);
       
       if (!userData) {
@@ -639,6 +657,7 @@ export const useAuthProvider = () => {
       }
 
       // Step 5: Set up badges for celebration
+      authLogger.info('Setting up welcome badges...');
       const defaultBadges = getDefaultBadgesForNewUser(userData);
       
       if (defaultBadges.length > 0) {
@@ -650,14 +669,14 @@ export const useAuthProvider = () => {
       // Step 6: Set user state
       setUser(userData);
       setIsAuthenticated(true);
-      setLoading(false);
       
       authLogger.info('Signup completed successfully');
       return;
     } catch (error) {
       const authError = handleAuthError(error, 'Signup');
-      setLoading(false);
       throw authError;
+    } finally {
+      setLoading(false);
     }
   }, [handleAuthError, loadUserData]);
 
@@ -679,6 +698,16 @@ export const useAuthProvider = () => {
       if (newBadges.length > 0) {
         authLogger.info('New badges unlocked', { badges: newBadges.map(b => b.name) });
         userWithScore.badges = [...(userWithScore.badges || []), ...newBadges];
+        
+        // Save new badges to Firestore
+        const badgesCollection = collection(db, 'userBadges');
+        for (const badge of newBadges) {
+          await addDoc(badgesCollection, {
+            userId: user.id,
+            badgeId: badge.id,
+            unlockedAt: serverTimestamp()
+          });
+        }
       }
       
       setUser(userWithScore);
@@ -687,7 +716,6 @@ export const useAuthProvider = () => {
       if (isAdmin) {
         authLogger.info('Admin user - skipping database save');
         if (newBadges.length > 0) {
-          authLogger.info('Setting newly unlocked badges for display', { badges: newBadges.map(b => b.name) });
           setNewlyUnlockedBadges(newBadges);
           toast.success(`🎉 ${newBadges.length} new badge${newBadges.length > 1 ? 's' : ''} unlocked!`);
         }
@@ -699,13 +727,13 @@ export const useAuthProvider = () => {
       const updateData = {
         ...userData,
         lifeScore: userWithScore.lifeScore,
-        lastActive: new Date()
+        lastActive: serverTimestamp()
       };
       
       await updateDoc(userDocRef, updateData);
+      authLogger.info('User data updated in Firestore');
       
       if (newBadges.length > 0) {
-        authLogger.info('Setting newly unlocked badges for display', { badges: newBadges.map(b => b.name) });
         setNewlyUnlockedBadges(newBadges);
         toast.success(`🎉 ${newBadges.length} new badge${newBadges.length > 1 ? 's' : ''} unlocked!`);
       }
