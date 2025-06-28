@@ -1,17 +1,34 @@
 import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
-import { User as SupabaseUser } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { 
+  User as FirebaseUser,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile
+} from 'firebase/auth';
+import { 
+  doc, 
+  setDoc, 
+  getDoc, 
+  updateDoc, 
+  collection, 
+  query, 
+  where, 
+  getDocs 
+} from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 import { User } from '../types';
 import { updateUserLifeScore } from '../utils/lifeScoreEngine';
 import { checkBadgeUnlocks, getDefaultBadgesForNewUser, ALL_BADGES } from '../utils/badgeSystem';
 import toast from 'react-hot-toast';
 
-// Enhanced timeout configuration with increased timeout values for better reliability
+// Enhanced timeout configuration
 const TIMEOUT_CONFIG = {
-  AUTH_OPERATIONS: 60000,     // 60 seconds for auth operations (increased from 30 seconds)
-  DATABASE_QUERIES: 60000,    // 60 seconds for database queries (increased from 30 seconds)
-  USER_CREATION: 60000,       // 60 seconds for user creation (increased from 30 seconds)
-  SESSION_CHECK: 45000        // 45 seconds for session checks (increased from 20 seconds)
+  AUTH_OPERATIONS: 30000,     // 30 seconds for auth operations
+  DATABASE_QUERIES: 20000,    // 20 seconds for database queries
+  USER_CREATION: 30000,       // 30 seconds for user creation
+  SESSION_CHECK: 10000        // 10 seconds for session checks
 };
 
 // Enhanced error types for better error handling
@@ -136,7 +153,7 @@ export const useAuthProvider = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [newlyUnlockedBadges, setNewlyUnlockedBadges] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [lastError, setLastError] = useState<AuthError | null>(null);
 
   const clearError = () => setLastError(null);
@@ -150,45 +167,45 @@ export const useAuthProvider = () => {
     if (error.type) {
       // Already an AuthError
       authError = error;
-    } else if (error.message?.includes('timeout') || error.message?.includes('timed out')) {
-      authError = {
-        type: AuthErrorType.TIMEOUT_ERROR,
-        message: `${operation} timed out. Please check your connection and try again.`,
-        originalError: error,
-        timestamp: new Date()
-      };
-    } else if (error.message?.includes('Invalid login credentials')) {
+    } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
       authError = {
         type: AuthErrorType.AUTH_ERROR,
         message: 'Invalid email or password. Please check your credentials and try again.',
         originalError: error,
         timestamp: new Date()
       };
-    } else if (error.message?.includes('User already registered')) {
+    } else if (error.code === 'auth/email-already-in-use') {
       authError = {
         type: AuthErrorType.VALIDATION_ERROR,
         message: 'An account with this email already exists. Please try logging in instead.',
         originalError: error,
         timestamp: new Date()
       };
-    } else if (error.message?.includes('Email not confirmed')) {
-      authError = {
-        type: AuthErrorType.AUTH_ERROR,
-        message: 'Please check your email and click the confirmation link before signing in.',
-        originalError: error,
-        timestamp: new Date()
-      };
-    } else if (error.message?.includes('email_address_invalid')) {
+    } else if (error.code === 'auth/weak-password') {
       authError = {
         type: AuthErrorType.VALIDATION_ERROR,
-        message: 'Please enter a valid email address with a proper domain (e.g., user@example.com).',
+        message: 'Password is too weak. Please choose a stronger password.',
         originalError: error,
         timestamp: new Date()
       };
-    } else if (error.message?.includes('row-level security policy')) {
+    } else if (error.code === 'auth/invalid-email') {
       authError = {
-        type: AuthErrorType.DATABASE_ERROR,
-        message: 'Account creation failed due to security settings. Please try again or contact support.',
+        type: AuthErrorType.VALIDATION_ERROR,
+        message: 'Please enter a valid email address.',
+        originalError: error,
+        timestamp: new Date()
+      };
+    } else if (error.code === 'auth/network-request-failed') {
+      authError = {
+        type: AuthErrorType.NETWORK_ERROR,
+        message: 'Network error. Please check your connection and try again.',
+        originalError: error,
+        timestamp: new Date()
+      };
+    } else if (error.message?.includes('timeout') || error.message?.includes('timed out')) {
+      authError = {
+        type: AuthErrorType.TIMEOUT_ERROR,
+        message: `${operation} timed out. Please check your connection and try again.`,
         originalError: error,
         timestamp: new Date()
       };
@@ -245,9 +262,9 @@ export const useAuthProvider = () => {
     role: 'admin'
   });
 
-  // Enhanced user data initialization with better error handling and RLS compliance
+  // Initialize user data in Firestore
   const initializeUserData = async (userId: string, name: string, email: string) => {
-    authLogger.info('Initializing user data', { userId, name, email });
+    authLogger.info('Initializing user data in Firestore', { userId, name, email });
     
     try {
       // Validate inputs
@@ -261,118 +278,60 @@ export const useAuthProvider = () => {
         throw new Error('Invalid email format');
       }
 
-      // Wait a moment to ensure the user session is fully established
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Verify we have a valid session before proceeding
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session) {
-        authLogger.error('No valid session found during user data initialization', sessionError);
-        throw new Error('Authentication session not found. Please try signing up again.');
-      }
-
-      authLogger.debug('Valid session confirmed, proceeding with data initialization');
-
-      // 1. Create profile with enhanced error handling
-      authLogger.debug('Creating profile...');
-      const profilePromise = supabase
-        .from('profiles')
-        .insert({
-          id: userId,
-          name: name.trim(),
-          avatar_url: null,
-          age: null,
-          gender: null,
-          country: '',
-          city: '',
-          life_score: 0,
-          avatar_badge_id: null,
-          wants_integrations: false
-        });
-
-      const { error: profileError } = await withTimeout(
-        profilePromise, 
-        TIMEOUT_CONFIG.DATABASE_QUERIES,
-        'profile creation'
-      );
-
-      if (profileError) {
-        authLogger.error('Profile creation failed', profileError);
-        throw profileError;
-      }
-      authLogger.info('Profile created successfully');
-
-      // 2. Create wealth data
-      authLogger.debug('Creating wealth data...');
-      const wealthPromise = supabase
-        .from('wealth_data')
-        .insert({
-          user_id: userId,
+      // Create user profile document
+      const userDocRef = doc(db, 'users', userId);
+      const userData = {
+        id: userId,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        avatar: null,
+        age: null,
+        gender: null,
+        country: '',
+        city: '',
+        lifeScore: 0,
+        avatarBadgeId: null,
+        wantsIntegrations: false,
+        wealth: {
           salary: 0,
           savings: 0,
           investments: 0,
           currency: 'USD',
           total: 0
-        });
-
-      const { error: wealthError } = await withTimeout(
-        wealthPromise, 
-        TIMEOUT_CONFIG.DATABASE_QUERIES,
-        'wealth data creation'
-      );
-
-      if (wealthError) {
-        authLogger.error('Wealth data creation failed', wealthError);
-        throw wealthError;
-      }
-      authLogger.info('Wealth data created successfully');
-
-      // 3. Create knowledge data
-      authLogger.debug('Creating knowledge data...');
-      const knowledgePromise = supabase
-        .from('knowledge_data')
-        .insert({
-          user_id: userId,
+        },
+        knowledge: {
           education: '',
           certificates: [],
           languages: [],
-          total_score: 0
-        });
+          total: 0
+        },
+        assets: [],
+        friends: [],
+        createdAt: new Date(),
+        lastActive: new Date(),
+        role: 'user'
+      };
 
-      const { error: knowledgeError } = await withTimeout(
-        knowledgePromise, 
+      await withTimeout(
+        setDoc(userDocRef, userData),
         TIMEOUT_CONFIG.DATABASE_QUERIES,
-        'knowledge data creation'
+        'user profile creation'
       );
 
-      if (knowledgeError) {
-        authLogger.error('Knowledge data creation failed', knowledgeError);
-        throw knowledgeError;
-      }
-      authLogger.info('Knowledge data created successfully');
-
-      // 4. Create starter badges
-      authLogger.debug('Creating starter badges...');
+      // Create starter badges
       const starterBadges = [
-        { user_id: userId, badge_id: 'welcome-aboard' },
-        { user_id: userId, badge_id: 'profile-complete' }
+        { userId, badgeId: 'welcome-aboard', unlockedAt: new Date() },
+        { userId, badgeId: 'profile-complete', unlockedAt: new Date() }
       ];
 
-      const badgesPromise = supabase
-        .from('user_badges')
-        .insert(starterBadges);
-
-      const { error: badgesError } = await withTimeout(
-        badgesPromise, 
-        TIMEOUT_CONFIG.DATABASE_QUERIES,
-        'starter badges creation'
-      );
-
-      if (badgesError) {
-        authLogger.error('Starter badges creation failed', badgesError);
-        throw badgesError;
+      const badgesCollection = collection(db, 'userBadges');
+      for (const badge of starterBadges) {
+        await withTimeout(
+          setDoc(doc(badgesCollection), badge),
+          TIMEOUT_CONFIG.DATABASE_QUERIES,
+          'starter badge creation'
+        );
       }
-      authLogger.info('Starter badges created successfully');
 
       authLogger.info('User data initialization complete');
       return true;
@@ -382,36 +341,25 @@ export const useAuthProvider = () => {
     }
   };
 
-  // Enhanced user data loading with better error handling
-  const loadUserData = useCallback(async (supabaseUser: SupabaseUser): Promise<User | null> => {
+  // Load user data from Firestore
+  const loadUserData = useCallback(async (firebaseUser: FirebaseUser): Promise<User | null> => {
     try {
-      authLogger.info('Loading user data', { userId: supabaseUser.id });
+      authLogger.info('Loading user data from Firestore', { userId: firebaseUser.uid });
       
-      // Get profile with enhanced error handling
-      const profilePromise = supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', supabaseUser.id)
-        .maybeSingle(); // Use maybeSingle to handle missing profiles gracefully
-
-      const { data: profile, error: profileError } = await withTimeout(
-        profilePromise, 
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      const userDocSnap = await withTimeout(
+        getDoc(userDocRef),
         TIMEOUT_CONFIG.DATABASE_QUERIES,
-        'profile query'
+        'user profile query'
       );
 
-      if (profileError) {
-        authLogger.error('Profile query failed', profileError);
-        throw profileError;
-      }
-
-      if (!profile) {
-        authLogger.warn('Profile not found, creating default user for onboarding');
+      if (!userDocSnap.exists()) {
+        authLogger.warn('User profile not found, creating default user for onboarding');
         return {
-          id: supabaseUser.id,
-          name: '',
-          email: supabaseUser.email || '',
-          avatar: undefined,
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || '',
+          email: firebaseUser.email || '',
+          avatar: firebaseUser.photoURL,
           age: undefined,
           gender: undefined,
           country: '',
@@ -440,116 +388,70 @@ export const useAuthProvider = () => {
         };
       }
 
-      // Load related data in parallel for better performance
-      const [wealthResult, knowledgeResult, assetsResult, badgesResult, friendsResult] = await Promise.allSettled([
-        withTimeout(
-          supabase.from('wealth_data').select('*').eq('user_id', supabaseUser.id).limit(1).maybeSingle(),
-          TIMEOUT_CONFIG.DATABASE_QUERIES,
-          'wealth data query'
-        ),
-        withTimeout(
-          supabase.from('knowledge_data').select('*').eq('user_id', supabaseUser.id).limit(1).maybeSingle(),
-          TIMEOUT_CONFIG.DATABASE_QUERIES,
-          'knowledge data query'
-        ),
-        withTimeout(
-          supabase.from('assets').select('*').eq('user_id', supabaseUser.id),
-          TIMEOUT_CONFIG.DATABASE_QUERIES,
-          'assets query'
-        ),
-        withTimeout(
-          supabase.from('user_badges').select('*').eq('user_id', supabaseUser.id),
-          TIMEOUT_CONFIG.DATABASE_QUERIES,
-          'badges query'
-        ),
-        withTimeout(
-          supabase.from('friendships').select('friend_id').eq('user_id', supabaseUser.id).eq('status', 'accepted'),
-          TIMEOUT_CONFIG.DATABASE_QUERIES,
-          'friends query'
-        )
-      ]);
+      const userData = userDocSnap.data();
 
-      // Extract data from settled promises
-      const wealthData = wealthResult.status === 'fulfilled' ? wealthResult.value.data : null;
-      const knowledgeData = knowledgeResult.status === 'fulfilled' ? knowledgeResult.value.data : null;
-      const assets = assetsResult.status === 'fulfilled' ? assetsResult.value.data : [];
-      const userBadges = badgesResult.status === 'fulfilled' ? badgesResult.value.data : [];
-      const friendships = friendsResult.status === 'fulfilled' ? friendsResult.value.data : [];
+      // Load user badges
+      const badgesQuery = query(
+        collection(db, 'userBadges'),
+        where('userId', '==', firebaseUser.uid)
+      );
+      
+      const badgesSnapshot = await withTimeout(
+        getDocs(badgesQuery),
+        TIMEOUT_CONFIG.DATABASE_QUERIES,
+        'user badges query'
+      );
 
-      // Log any failed queries
-      [wealthResult, knowledgeResult, assetsResult, badgesResult, friendsResult].forEach((result, index) => {
-        if (result.status === 'rejected') {
-          const queryNames = ['wealth', 'knowledge', 'assets', 'badges', 'friends'];
-          authLogger.warn(`${queryNames[index]} query failed`, result.reason);
-        }
-      });
+      const userBadges = badgesSnapshot.docs.map(doc => {
+        const badgeData = doc.data();
+        const badge = ALL_BADGES.find(b => b.id === badgeData.badgeId);
+        return badge ? {
+          ...badge,
+          unlockedAt: badgeData.unlockedAt?.toDate() || new Date()
+        } : null;
+      }).filter(Boolean);
 
-      // Convert to User type
-      const userData: User = {
-        id: profile.id,
-        name: profile.name || '',
-        email: supabaseUser.email || '',
-        avatar: profile.avatar_url,
-        age: profile.age,
-        gender: profile.gender,
-        country: profile.country || '',
-        city: profile.city || '',
-        lifeScore: profile.life_score || 0,
-        wealth: wealthData ? {
-          id: wealthData.id,
-          salary: wealthData.salary || 0,
-          savings: wealthData.savings || 0,
-          investments: wealthData.investments || 0,
-          currency: wealthData.currency || 'USD',
-          total: wealthData.total || 0
-        } : {
+      // Convert Firestore data to User type
+      const user: User = {
+        id: userData.id,
+        name: userData.name || '',
+        email: userData.email || firebaseUser.email || '',
+        avatar: userData.avatar || firebaseUser.photoURL,
+        age: userData.age,
+        gender: userData.gender,
+        country: userData.country || '',
+        city: userData.city || '',
+        lifeScore: userData.lifeScore || 0,
+        wealth: userData.wealth || {
           salary: 0,
           savings: 0,
           investments: 0,
           currency: 'USD',
           total: 0
         },
-        knowledge: knowledgeData ? {
-          id: knowledgeData.id,
-          education: knowledgeData.education || '',
-          certificates: knowledgeData.certificates || [],
-          languages: knowledgeData.languages || [],
-          total: knowledgeData.total_score || 0
-        } : {
+        knowledge: userData.knowledge || {
           education: '',
           certificates: [],
           languages: [],
           total: 0
         },
-        assets: assets?.map(asset => ({
-          id: asset.id,
-          type: asset.type,
-          name: asset.name,
-          value: asset.value,
-          verified: asset.verified
-        })) || [],
-        badges: userBadges?.map(ub => {
-          const badge = ALL_BADGES.find(b => b.id === ub.badge_id);
-          return badge ? {
-            ...badge,
-            unlockedAt: new Date(ub.unlocked_at)
-          } : null;
-        }).filter(Boolean) || [],
-        friends: friendships?.map(f => f.friend_id) || [],
-        createdAt: new Date(profile.created_at),
+        assets: userData.assets || [],
+        badges: userBadges,
+        friends: userData.friends || [],
+        createdAt: userData.createdAt?.toDate() || new Date(),
         lastActive: new Date(),
-        avatarBadge: profile.avatar_badge_id ? ALL_BADGES.find(b => b.id === profile.avatar_badge_id) : undefined,
-        wantsIntegrations: profile.wants_integrations || false,
-        role: 'user'
+        avatarBadge: userData.avatarBadgeId ? ALL_BADGES.find(b => b.id === userData.avatarBadgeId) : undefined,
+        wantsIntegrations: userData.wantsIntegrations || false,
+        role: userData.role || 'user'
       };
 
-      authLogger.info('User data loaded successfully', { userName: userData.name });
-      return userData;
+      authLogger.info('User data loaded successfully', { userName: user.name });
+      return user;
     } catch (error) {
       authLogger.error('Error loading user data', error);
       return null;
     }
-  }, [handleAuthError]);
+  }, []);
 
   const logout = useCallback(async () => {
     try {
@@ -566,16 +468,11 @@ export const useAuthProvider = () => {
         return;
       }
       
-      const logoutPromise = supabase.auth.signOut();
-      const { error } = await withTimeout(
-        logoutPromise, 
+      await withTimeout(
+        signOut(auth),
         TIMEOUT_CONFIG.AUTH_OPERATIONS,
         'logout'
       );
-      
-      if (error && !error.message.includes('Session from session_id claim in JWT does not exist')) {
-        authLogger.error('Logout failed', error);
-      }
       
       setUser(null);
       setIsAuthenticated(false);
@@ -591,91 +488,34 @@ export const useAuthProvider = () => {
     } finally {
       setLoading(false);
     }
-  }, [handleAuthError]);
+  }, [handleAuthError, isAdmin]);
 
-  // Initialize auth with enhanced error handling
+  // Initialize auth with Firebase
   useEffect(() => {
     let isMounted = true;
 
-    const initializeAuth = async () => {
-      try {
-        authLogger.info('Initializing authentication...');
-
-        const sessionPromise = supabase.auth.getSession();
-        const { data: { session }, error } = await withTimeout(
-          sessionPromise, 
-          TIMEOUT_CONFIG.SESSION_CHECK,
-          'initial session check'
-        );
-        
-        if (error) {
-          handleAuthError(error, 'Initial session check');
-          if (isMounted) {
-            setIsAuthenticated(false);
-            setUser(null);
-            setLoading(false);
-          }
-          return;
-        }
-
-        if (session?.user && isMounted) {
-          authLogger.info('Found existing session', { userId: session.user.id });
-          const userData = await loadUserData(session.user);
-          
-          if (userData && isMounted) {
-            setUser(userData);
-            setIsAuthenticated(true);
-            authLogger.info('User authenticated successfully');
-          }
-        } else {
-          authLogger.info('No existing session found');
-        }
-      } catch (error) {
-        handleAuthError(error, 'Authentication initialization');
-        if (isMounted) {
-          setIsAuthenticated(false);
-          setUser(null);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    initializeAuth();
-
-    // Listen for auth changes with enhanced error handling
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!isMounted) return;
 
-      authLogger.info('Auth state changed', { event });
-      
       try {
-        if (event === 'SIGNED_IN' && session?.user) {
-          authLogger.info('User signed in', { userId: session.user.id });
-          const userData = await loadUserData(session.user);
+        setLoading(true);
+        
+        if (firebaseUser) {
+          authLogger.info('Firebase user authenticated', { userId: firebaseUser.uid });
+          const userData = await loadUserData(firebaseUser);
           
           if (userData && isMounted) {
             setUser(userData);
             setIsAuthenticated(true);
             clearError();
           }
-        } else if (event === 'SIGNED_OUT') {
-          authLogger.info('User signed out');
+        } else {
+          authLogger.info('No Firebase user found');
           if (isMounted) {
             setUser(null);
             setIsAuthenticated(false);
             setIsAdmin(false);
             setNewlyUnlockedBadges([]);
-            clearError();
-          }
-        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-          authLogger.info('Token refreshed', { userId: session.user.id });
-          const userData = await loadUserData(session.user);
-          if (userData && isMounted) {
-            setUser(userData);
-            setIsAuthenticated(true);
           }
         }
       } catch (error) {
@@ -686,14 +526,18 @@ export const useAuthProvider = () => {
           setIsAdmin(false);
           setNewlyUnlockedBadges([]);
         }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     });
 
     return () => {
       isMounted = false;
-      subscription.unsubscribe();
+      unsubscribe();
     };
-  }, [loadUserData, handleAuthError, logout]);
+  }, [loadUserData, handleAuthError]);
 
   const login = useCallback(async (email: string, password: string): Promise<void> => {
     try {
@@ -711,7 +555,7 @@ export const useAuthProvider = () => {
         throw new Error(passwordValidation.message);
       }
       
-      // Admin login - handle this first before attempting Supabase auth
+      // Admin login - handle this first before attempting Firebase auth
       if (email === 'admin' && password === 'admin123') {
         authLogger.info('Admin login detected');
         const adminUser = createMockAdminUser();
@@ -723,24 +567,15 @@ export const useAuthProvider = () => {
         return;
       }
 
-      // Regular user login with enhanced timeout and error handling
-      const loginPromise = supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password
-      });
-
-      const { data, error } = await withTimeout(
-        loginPromise, 
+      // Regular user login with Firebase
+      const userCredential = await withTimeout(
+        signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password),
         TIMEOUT_CONFIG.AUTH_OPERATIONS,
         'user login'
       );
 
-      if (error) {
-        throw error;
-      }
-
-      if (data.user) {
-        authLogger.info('Login successful', { userId: data.user.id });
+      if (userCredential.user) {
+        authLogger.info('Login successful', { userId: userCredential.user.uid });
         setLoading(false);
         return;
       }
@@ -775,47 +610,35 @@ export const useAuthProvider = () => {
         throw new Error(nameValidation.message);
       }
       
-      // Step 1: Create auth user with enhanced timeout
-      const signupPromise = supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: {
-          data: {
-            name: name.trim()
-          }
-        }
-      });
-
-      const { data, error } = await withTimeout(
-        signupPromise, 
+      // Step 1: Create Firebase auth user
+      const userCredential = await withTimeout(
+        createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password),
         TIMEOUT_CONFIG.AUTH_OPERATIONS,
         'user signup'
       );
 
-      if (error) {
-        throw error;
-      }
-
-      if (!data.user) {
+      if (!userCredential.user) {
         throw new Error('Signup failed - no user returned');
       }
 
-      authLogger.info('Auth user created', { userId: data.user.id });
+      // Step 2: Update Firebase user profile
+      await updateProfile(userCredential.user, {
+        displayName: name.trim()
+      });
 
-      // Step 2: Initialize user data in database
-      authLogger.debug('Initializing user data...');
-      await initializeUserData(data.user.id, name.trim(), email.trim().toLowerCase());
+      authLogger.info('Firebase user created', { userId: userCredential.user.uid });
 
-      // Step 3: Load complete user data
-      authLogger.debug('Loading complete user data...');
-      const userData = await loadUserData(data.user);
+      // Step 3: Initialize user data in Firestore
+      await initializeUserData(userCredential.user.uid, name.trim(), email.trim().toLowerCase());
+
+      // Step 4: Load complete user data
+      const userData = await loadUserData(userCredential.user);
       
       if (!userData) {
         throw new Error('Failed to load user data after signup');
       }
 
-      // Step 4: Set up badges for celebration
-      authLogger.debug('Setting up badge celebration...');
+      // Step 5: Set up badges for celebration
       const defaultBadges = getDefaultBadgesForNewUser(userData);
       
       if (defaultBadges.length > 0) {
@@ -824,7 +647,7 @@ export const useAuthProvider = () => {
         userData.badges = [...userData.badges, ...defaultBadges];
       }
 
-      // Step 5: Set user state
+      // Step 6: Set user state
       setUser(userData);
       setIsAuthenticated(true);
       setLoading(false);
@@ -836,7 +659,7 @@ export const useAuthProvider = () => {
       setLoading(false);
       throw authError;
     }
-  }, [handleAuthError]);
+  }, [handleAuthError, loadUserData]);
 
   const updateUser = useCallback(async (userData: Partial<User>) => {
     if (!user) {
@@ -860,7 +683,7 @@ export const useAuthProvider = () => {
       
       setUser(userWithScore);
       
-      // Don't try to save admin user data to Supabase
+      // Don't try to save admin user data to Firebase
       if (isAdmin) {
         authLogger.info('Admin user - skipping database save');
         if (newBadges.length > 0) {
@@ -871,8 +694,15 @@ export const useAuthProvider = () => {
         return;
       }
       
-      // Save to database for real users
-      // This would be implemented with proper database save logic
+      // Save to Firestore for real users
+      const userDocRef = doc(db, 'users', user.id);
+      const updateData = {
+        ...userData,
+        lifeScore: userWithScore.lifeScore,
+        lastActive: new Date()
+      };
+      
+      await updateDoc(userDocRef, updateData);
       
       if (newBadges.length > 0) {
         authLogger.info('Setting newly unlocked badges for display', { badges: newBadges.map(b => b.name) });
