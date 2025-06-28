@@ -32,7 +32,7 @@ const OnboardingFlow: React.FC = () => {
     } else {
       // Complete onboarding
       updateUser(formData);
-      localStorage.setItem('lifescore_onboarding_complete', 'true');
+      
     }
   };
 
