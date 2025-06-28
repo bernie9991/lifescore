@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import WelcomeStep from './WelcomeStep';
 import BasicInfoStep from './BasicInfoStep';
-import UsernameStep from './UsernameStep';
 import WealthStep from './WealthStep';
 import AssetsStep from './AssetsStep';
 import KnowledgeStep from './KnowledgeStep';
@@ -17,7 +16,6 @@ const OnboardingFlow: React.FC = () => {
   const steps = [
     WelcomeStep,
     BasicInfoStep,
-    UsernameStep,
     WealthStep,
     AssetsStep,
     KnowledgeStep,
@@ -25,26 +23,39 @@ const OnboardingFlow: React.FC = () => {
   ];
 
   const nextStep = (data?: any) => {
+    console.log('🔍 ONBOARDING: Next step called', { currentStep, data });
+    
     if (data) {
-      setFormData(prev => ({ ...prev, ...data }));
+      const newFormData = { ...formData, ...data };
+      setFormData(newFormData);
+      console.log('🔍 ONBOARDING: Updated form data', newFormData);
     }
     
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
+      console.log('🔍 ONBOARDING: Moving to step', currentStep + 1);
     } else {
       // Complete onboarding
+      console.log('🔍 ONBOARDING: Completing onboarding with final data', formData);
+      
+      // Update user with all collected data
       updateUser(formData);
-      localStorage.setItem('lifescore_onboarding_complete', 'true'); 
+      
+      // The ResultsStep component will handle setting the completion flag and navigation
+      console.log('🔍 ONBOARDING: Onboarding flow completed');
     }
   };
 
   const prevStep = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
+      console.log('🔍 ONBOARDING: Moving back to step', currentStep - 1);
     }
   };
 
   const CurrentStepComponent = steps[currentStep];
+
+  console.log('🔍 ONBOARDING: Rendering step', currentStep, 'of', steps.length);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center p-4">

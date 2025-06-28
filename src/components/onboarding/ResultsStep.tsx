@@ -47,13 +47,16 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ data, onNext }) => {
   }, [data, lifeScore, onNext]);
 
   const handleComplete = () => {
-    // Set the completion flag BEFORE navigating
+    console.log('🔍 ONBOARDING COMPLETE: Setting completion flag and navigating');
+    
+    // *** CRITICAL: Set the completion flag BEFORE navigating ***
     localStorage.setItem('lifescore_onboarding_complete', 'true');
     
-    console.log("Onboarding complete, navigating to dashboard");
-    
-    // Navigate to dashboard
-    navigate('/dashboard');
+    // Small delay to ensure localStorage is set
+    setTimeout(() => {
+      console.log('🔍 ONBOARDING COMPLETE: Navigating to dashboard');
+      navigate('/dashboard');
+    }, 100);
   };
 
   if (!showResults) {

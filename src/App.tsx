@@ -15,17 +15,22 @@ const AppContent: React.FC = () => {
   const onboardingComplete = localStorage.getItem('lifescore_onboarding_complete') === 'true';
 
   // Check if user needs onboarding (incomplete profile)
-  // Only check this if onboarding hasn't been marked as complete
-  const needsOnboarding = isAuthenticated && !onboardingComplete && user && (
-    !user.username || 
+  // A user needs onboarding if they don't have basic profile data OR their lifeScore is 0
+  const needsOnboarding = user && (
+    !onboardingComplete || 
     !user.name || 
     !user.country || 
     !user.city || 
     user.lifeScore === 0
   );
 
-  console.log('Auth state:', { isAuthenticated, isAdmin, needsOnboarding, onboardingComplete });
-  console.log('User data:', user);
+  console.log('🔍 APP ROUTING DEBUG:', {
+    isAuthenticated,
+    isAdmin,
+    user: user ? { id: user.id, name: user.name, country: user.country, city: user.city, lifeScore: user.lifeScore } : null,
+    onboardingComplete,
+    needsOnboarding
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
