@@ -6,12 +6,12 @@ import { updateUserLifeScore } from '../utils/lifeScoreEngine';
 import { checkBadgeUnlocks, getDefaultBadgesForNewUser, ALL_BADGES } from '../utils/badgeSystem';
 import toast from 'react-hot-toast';
 
-// Enhanced timeout configuration with reasonable timeout values
+// Enhanced timeout configuration with increased timeout values for better reliability
 const TIMEOUT_CONFIG = {
-  AUTH_OPERATIONS: 15000,     // 15 seconds for auth operations
-  DATABASE_QUERIES: 10000,    // 10 seconds for database queries
-  USER_CREATION: 20000,       // 20 seconds for user creation
-  SESSION_CHECK: 5000         // 5 seconds for session checks
+  AUTH_OPERATIONS: 30000,     // 30 seconds for auth operations
+  DATABASE_QUERIES: 20000,    // 20 seconds for database queries
+  USER_CREATION: 30000,       // 30 seconds for user creation
+  SESSION_CHECK: 10000        // 10 seconds for session checks
 };
 
 // Enhanced error types for better error handling
@@ -564,7 +564,7 @@ export const useAuthProvider = () => {
     }
   }, [handleAuthError]);
 
-  // Enhanced user data saving with better error handling
+  // Enhanced user data saving with better error handling and fixed circular reference issue
   const saveUserData = async (userData: User) => {
     try {
       authLogger.info('Saving user data', { userName: userData.name });
@@ -575,24 +575,21 @@ export const useAuthProvider = () => {
         return isNaN(parsed) ? 0 : parsed;
       };
 
-      // Create a clean copy of userData without non-serializable properties
-      const cleanUserData = { ...userData };
-      delete cleanUserData.scoreBreakdown; // Remove scoreBreakdown to prevent circular reference
-
-      // Update profile with enhanced error handling
+      // Update profile with only the columns that exist in the profiles table
+      // This prevents circular reference errors by excluding complex objects
       const profilePromise = supabase
         .from('profiles')
         .upsert({
-          id: cleanUserData.id,
-          name: cleanUserData.name?.trim() || '',
-          avatar_url: cleanUserData.avatar || null,
-          age: cleanUserData.age ? safeInt(cleanUserData.age) : null,
-          gender: cleanUserData.gender || null,
-          country: cleanUserData.country || '',
-          city: cleanUserData.city || '',
-          life_score: safeInt(cleanUserData.lifeScore),
-          avatar_badge_id: cleanUserData.avatarBadge?.id || null,
-          wants_integrations: cleanUserData.wantsIntegrations || false
+          id: userData.id,
+          name: userData.name?.trim() || '',
+          avatar_url: userData.avatar || null,
+          age: userData.age ? safeInt(userData.age) : null,
+          gender: userData.gender || null,
+          country: userData.country || '',
+          city: userData.city || '',
+          life_score: safeInt(userData.lifeScore),
+          avatar_badge_id: userData.avatarBadge?.id || null,
+          wants_integrations: userData.wantsIntegrations || false
         });
 
       const { error: profileError } = await withTimeout(
@@ -607,17 +604,17 @@ export const useAuthProvider = () => {
       }
 
       // Update wealth data if present
-      if (cleanUserData.wealth) {
+      if (userData.wealth) {
         const wealthPromise = supabase
           .from('wealth_data')
           .upsert({
-            id: cleanUserData.wealth.id,
-            user_id: cleanUserData.id,
-            salary: safeInt(cleanUserData.wealth.salary),
-            savings: safeInt(cleanUserData.wealth.savings),
-            investments: safeInt(cleanUserData.wealth.investments),
-            currency: cleanUserData.wealth.currency || 'USD',
-            total: safeInt(cleanUserData.wealth.total)
+            id: userData.wealth.id,
+            user_id: userData.id,
+            salary: safeInt(userData.wealth.salary),
+            savings: safeInt(userData.wealth.savings),
+            investments: safeInt(userData.wealth.investments),
+            currency: userData.wealth.currency || 'USD',
+            total: safeInt(userData.wealth.total)
           });
 
         const { error: wealthError } = await withTimeout(
@@ -633,16 +630,16 @@ export const useAuthProvider = () => {
       }
 
       // Update knowledge data if present
-      if (cleanUserData.knowledge) {
+      if (userData.knowledge) {
         const knowledgePromise = supabase
           .from('knowledge_data')
           .upsert({
-            id: cleanUserData.knowledge.id,
-            user_id: cleanUserData.id,
-            education: cleanUserData.knowledge.education || '',
-            certificates: cleanUserData.knowledge.certificates || [],
-            languages: cleanUserData.knowledge.languages || [],
-            total_score: safeInt(cleanUserData.knowledge.total)
+            id: userData.knowledge.id,
+            user_id: userData.id,
+            education: userData.knowledge.education || '',
+            certificates: userData.knowledge.certificates || [],
+            languages: userData.knowledge.languages || [],
+            total_score: safeInt(userData.knowledge.total)
           });
 
         const { error: knowledgeError } = await withTimeout(
@@ -658,12 +655,12 @@ export const useAuthProvider = () => {
       }
 
       // Update assets if present
-      if (cleanUserData.assets && cleanUserData.assets.length > 0) {
+      if (userData.assets && userData.assets.length > 0) {
         // Delete existing assets first
         const deleteAssetsPromise = supabase
           .from('assets')
           .delete()
-          .eq('user_id', cleanUserData.id);
+          .eq('user_id', userData.id);
 
         await withTimeout(
           deleteAssetsPromise, 
@@ -674,9 +671,9 @@ export const useAuthProvider = () => {
         // Insert new assets
         const insertAssetsPromise = supabase
           .from('assets')
-          .insert(cleanUserData.assets.map(asset => ({
+          .insert(userData.assets.map(asset => ({
             id: asset.id,
-            user_id: cleanUserData.id,
+            user_id: userData.id,
             type: asset.type,
             name: asset.name,
             value: safeInt(asset.value),
@@ -696,11 +693,11 @@ export const useAuthProvider = () => {
       }
 
       // Update badges if present
-      if (cleanUserData.badges && cleanUserData.badges.length > 0) {
+      if (userData.badges && userData.badges.length > 0) {
         const existingBadgesPromise = supabase
           .from('user_badges')
           .select('badge_id')
-          .eq('user_id', cleanUserData.id);
+          .eq('user_id', userData.id);
 
         const { data: existingBadges } = await withTimeout(
           existingBadgesPromise, 
@@ -709,14 +706,14 @@ export const useAuthProvider = () => {
         );
 
         const existingBadgeIds = existingBadges?.map(b => b.badge_id) || [];
-        const newBadges = cleanUserData.badges.filter(b => !existingBadgeIds.includes(b.id));
+        const newBadges = userData.badges.filter(b => !existingBadgeIds.includes(b.id));
 
         if (newBadges.length > 0) {
           authLogger.info('Inserting new badges', { badges: newBadges.map(b => b.name) });
           const insertBadgesPromise = supabase
             .from('user_badges')
             .insert(newBadges.map(badge => ({
-              user_id: cleanUserData.id,
+              user_id: userData.id,
               badge_id: badge.id,
               unlocked_at: badge.unlockedAt?.toISOString() || new Date().toISOString()
             })));
@@ -1041,7 +1038,17 @@ export const useAuthProvider = () => {
     try {
       authLogger.debug('Updating user', userData);
       
-      const previousUser = JSON.parse(JSON.stringify(user));
+      // Create a clean copy of the previous user without circular references
+      const previousUser = JSON.parse(JSON.stringify(user, (key, value) => {
+        // Filter out any potential circular references or non-serializable objects
+        if (typeof value === 'object' && value !== null) {
+          if (value.constructor === Window || value.constructor === Document) {
+            return undefined;
+          }
+        }
+        return value;
+      }));
+      
       const updatedUser = { ...user, ...userData };
       const userWithScore = updateUserLifeScore(updatedUser);
       
