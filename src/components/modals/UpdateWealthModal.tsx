@@ -36,13 +36,17 @@ const UpdateWealthModal: React.FC<UpdateWealthModalProps> = ({
                   (parseInt(data.investments) || 0);
     
     const wealthData = {
-      id: currentWealth?.id, // Include the ID for database record update
       salary: parseInt(data.salary) || 0,
       savings: parseInt(data.savings) || 0,
       investments: parseInt(data.investments) || 0,
       currency: data.currency || 'USD',
       total
     };
+
+    // Only include id if it exists and is not undefined
+    if (currentWealth?.id) {
+      wealthData.id = currentWealth.id;
+    }
     
     onUpdate(wealthData);
     triggerLevelUpConfetti();
