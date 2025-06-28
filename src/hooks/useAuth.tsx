@@ -75,7 +75,7 @@ const authLogger = {
 };
 
 // Enhanced timeout wrapper with better error handling
-const withTimeout = <T>(
+const withTimeout = <T,>(
   promise: Promise<T>, 
   timeoutMs: number,
   operation: string = 'operation'
