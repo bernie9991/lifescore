@@ -684,30 +684,294 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
       {/* Knowledge Paths Tab */}
       {activeTab === 'knowledge' && (
         <div className="space-y-4 md:space-y-6">
-          {/* Empty Knowledge Paths State */}
-          <Card className="p-8 text-center bg-gradient-to-br from-gray-800/50 to-gray-900/50">
-            <div className="max-w-md mx-auto">
-              <div className="w-24 h-24 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <BookOpen className="w-12 h-12 text-purple-400" />
+          {/* Skill Tree Preview */}
+          <Card className="p-8 bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm border border-gray-700/50 overflow-hidden relative">
+            {/* Animated background pattern */}
+            <div className="absolute inset-0 opacity-5">
+              <motion.div
+                className="absolute inset-0"
+                animate={{
+                  background: [
+                    'radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.3) 0%, transparent 50%)',
+                    'radial-gradient(circle at 80% 50%, rgba(168, 85, 247, 0.3) 0%, transparent 50%)',
+                    'radial-gradient(circle at 50% 20%, rgba(236, 72, 153, 0.3) 0%, transparent 50%)',
+                    'radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.3) 0%, transparent 50%)'
+                  ]
+                }}
+                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+              />
+            </div>
+
+            <div className="relative z-10">
+              {/* Header */}
+              <div className="text-center mb-8">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: "spring", bounce: 0.5 }}
+                  className="w-20 h-20 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-purple-500/30"
+                >
+                  <TreePine className="w-10 h-10 text-white" />
+                </motion.div>
+                
+                <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                  🌳 Interactive Skill Tree
+                </h2>
+                <div className="inline-flex items-center px-4 py-2 bg-yellow-500/20 border border-yellow-400/40 rounded-full text-yellow-300 text-sm font-semibold mb-4">
+                  <Zap className="w-4 h-4 mr-2" />
+                  Coming Soon
+                </div>
+                <p className="text-gray-300 text-lg max-w-3xl mx-auto leading-relaxed">
+                  Unlock your potential with our revolutionary skill tree system. Choose your path, master new abilities, 
+                  and watch your knowledge network grow with every achievement.
+                </p>
               </div>
-              
-              <h3 className="text-2xl font-bold text-white mb-4">
-                Knowledge paths coming soon
-              </h3>
-              
-              <p className="text-gray-400 mb-6 leading-relaxed">
-                Structured learning paths from world-class institutions will be available soon. Stay tuned for updates!
-              </p>
-              
-              <div className="space-y-3">
-                <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
-                  <GraduationCap className="w-4 h-4" />
-                  <span>Learn from top institutions</span>
-                </div>
-                <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
-                  <Award className="w-4 h-4" />
-                  <span>Earn certificates and badges</span>
-                </div>
+
+              {/* Skill Tree Visualization */}
+              <div className="relative h-96 md:h-[500px] bg-gradient-to-br from-gray-900/50 to-black/50 rounded-2xl border border-gray-600/50 overflow-hidden mb-8">
+                {/* Central Hub */}
+                <motion.div
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.5, duration: 0.8 }}
+                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20"
+                >
+                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center border-4 border-white/20 shadow-lg shadow-blue-500/30">
+                    <Brain className="w-8 h-8 text-white" />
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full animate-ping opacity-20" />
+                </motion.div>
+
+                {/* Skill Nodes - Red Path (Top) */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.8 }}
+                  className="absolute top-16 left-1/2 transform -translate-x-1/2"
+                >
+                  <div className="flex items-center space-x-8">
+                    <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center border-2 border-red-400/50 shadow-lg shadow-red-500/30">
+                      <DollarSign className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center border-2 border-red-400/50 shadow-lg shadow-red-500/30">
+                      <TrendingUp className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                  {/* Connection lines */}
+                  <svg className="absolute top-6 left-6 w-20 h-2" viewBox="0 0 80 8">
+                    <motion.line
+                      x1="0" y1="4" x2="80" y2="4"
+                      stroke="rgb(239 68 68)"
+                      strokeWidth="2"
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1 }}
+                      transition={{ delay: 1, duration: 0.8 }}
+                    />
+                  </svg>
+                </motion.div>
+
+                {/* Skill Nodes - Cyan Path (Right) */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1.0 }}
+                  className="absolute top-1/2 right-16 transform -translate-y-1/2"
+                >
+                  <div className="flex flex-col items-center space-y-8">
+                    <div className="w-12 h-12 bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-full flex items-center justify-center border-2 border-cyan-400/50 shadow-lg shadow-cyan-500/30">
+                      <Cpu className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="w-12 h-12 bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-full flex items-center justify-center border-2 border-cyan-400/50 shadow-lg shadow-cyan-500/30">
+                      <Lightbulb className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Skill Nodes - Green Path (Bottom Right) */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1.2 }}
+                  className="absolute bottom-16 right-1/4"
+                >
+                  <div className="flex items-center space-x-8">
+                    <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center border-2 border-green-400/50 shadow-lg shadow-green-500/30">
+                      <GraduationCap className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center border-2 border-green-400/50 shadow-lg shadow-green-500/30">
+                      <BookOpen className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Skill Nodes - Yellow Path (Left) */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1.4 }}
+                  className="absolute top-1/2 left-16 transform -translate-y-1/2"
+                >
+                  <div className="flex flex-col items-center space-y-8">
+                    <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-full flex items-center justify-center border-2 border-yellow-400/50 shadow-lg shadow-yellow-500/30">
+                      <Palette className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-full flex items-center justify-center border-2 border-yellow-400/50 shadow-lg shadow-yellow-500/30">
+                      <Camera className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Skill Nodes - Pink Path (Bottom Left) */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1.6 }}
+                  className="absolute bottom-16 left-1/4"
+                >
+                  <div className="flex items-center space-x-8">
+                    <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-pink-600 rounded-full flex items-center justify-center border-2 border-pink-400/50 shadow-lg shadow-pink-500/30">
+                      <Users className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-pink-600 rounded-full flex items-center justify-center border-2 border-pink-400/50 shadow-lg shadow-pink-500/30">
+                      <Heart className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Connection Lines from Center */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                  {/* Red path line */}
+                  <motion.line
+                    x1="50%" y1="50%" x2="50%" y2="20%"
+                    stroke="rgb(239 68 68)"
+                    strokeWidth="3"
+                    strokeDasharray="5,5"
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: 1, opacity: 0.6 }}
+                    transition={{ delay: 1.8, duration: 1 }}
+                  />
+                  {/* Cyan path line */}
+                  <motion.line
+                    x1="50%" y1="50%" x2="80%" y2="50%"
+                    stroke="rgb(6 182 212)"
+                    strokeWidth="3"
+                    strokeDasharray="5,5"
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: 1, opacity: 0.6 }}
+                    transition={{ delay: 2.0, duration: 1 }}
+                  />
+                  {/* Green path line */}
+                  <motion.line
+                    x1="50%" y1="50%" x2="75%" y2="80%"
+                    stroke="rgb(34 197 94)"
+                    strokeWidth="3"
+                    strokeDasharray="5,5"
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: 1, opacity: 0.6 }}
+                    transition={{ delay: 2.2, duration: 1 }}
+                  />
+                  {/* Yellow path line */}
+                  <motion.line
+                    x1="50%" y1="50%" x2="20%" y2="50%"
+                    stroke="rgb(234 179 8)"
+                    strokeWidth="3"
+                    strokeDasharray="5,5"
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: 1, opacity: 0.6 }}
+                    transition={{ delay: 2.4, duration: 1 }}
+                  />
+                  {/* Pink path line */}
+                  <motion.line
+                    x1="50%" y1="50%" x2="25%" y2="80%"
+                    stroke="rgb(236 72 153)"
+                    strokeWidth="3"
+                    strokeDasharray="5,5"
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: 1, opacity: 0.6 }}
+                    transition={{ delay: 2.6, duration: 1 }}
+                  />
+                </svg>
+
+                {/* Floating particles */}
+                {[...Array(8)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute w-2 h-2 bg-blue-400 rounded-full"
+                    style={{
+                      left: `${20 + i * 10}%`,
+                      top: `${30 + (i % 3) * 20}%`,
+                    }}
+                    animate={{
+                      y: [0, -20, 0],
+                      opacity: [0.3, 1, 0.3],
+                      scale: [0.8, 1.2, 0.8],
+                    }}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                      delay: i * 0.5,
+                      ease: "easeInOut"
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* Feature Highlights */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 2.8 }}
+                  className="text-center p-6 bg-gradient-to-br from-red-500/10 to-orange-500/10 border border-red-400/30 rounded-xl"
+                >
+                  <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Target className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">Choose Your Path</h3>
+                  <p className="text-gray-300 text-sm">Select from multiple skill branches: Finance, Technology, Creative, Leadership, and more.</p>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 3.0 }}
+                  className="text-center p-6 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-400/30 rounded-xl"
+                >
+                  <div className="w-12 h-12 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Zap className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">Unlock Abilities</h3>
+                  <p className="text-gray-300 text-sm">Complete challenges to unlock new skills and advance through interconnected knowledge nodes.</p>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 3.2 }}
+                  className="text-center p-6 bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-400/30 rounded-xl"
+                >
+                  <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Trophy className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">Master Skills</h3>
+                  <p className="text-gray-300 text-sm">Earn certificates, badges, and real-world recognition as you progress through each skill tree.</p>
+                </motion.div>
+              </div>
+
+              {/* Call to Action */}
+              <div className="text-center">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 3.4 }}
+                  className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full text-white font-semibold shadow-lg shadow-purple-500/30"
+                >
+                  <Rocket className="w-5 h-5" />
+                  <span>Launching Soon</span>
+                </motion.div>
+                <p className="text-gray-400 text-sm mt-4">
+                  Be the first to experience the future of skill development
+                </p>
               </div>
             </div>
           </Card>
