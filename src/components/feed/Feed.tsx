@@ -60,7 +60,6 @@ import {
   deleteDoc
 } from 'firebase/firestore';
 import toast from 'react-hot-toast';
-import FeedPostGenerator from './FeedPostGenerator';
 import AutomatedFeedPost from './AutomatedFeedPost';
 import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
@@ -255,9 +254,9 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
         );
       }
 
-      console.log('Executing feed query...');
+      console.log('📊 FEED: Executing feed query...');
       const querySnapshot = await getDocs(feedQuery);
-      console.log(`Query returned ${querySnapshot.docs.length} documents`);
+      console.log(`📊 FEED: Query returned ${querySnapshot.docs.length} documents`);
       
       const items: FeedItem[] = [];
 
@@ -611,76 +610,7 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
     toast.success('Post hidden');
   }, []);
 
-  // Handle create post
-  const handleCreatePost = useCallback(async (postData: any) => {
-    try {
-      // Add timestamp and other required fields
-      const feedItemData = {
-        ...postData,
-        timestamp: serverTimestamp(),
-        isSelfDeclared: true,
-        seedCount: 0,
-        seededBy: [],
-        isVerified: false,
-        isAdminVerified: false,
-        reactions: {},
-        comments: []
-      };
-      
-      // Add to Firestore
-      const docRef = await addDoc(collection(db, 'feedItems'), feedItemData);
-      
-      // Update local state
-      const newItem: FeedItem = {
-        id: docRef.id,
-        ...feedItemData,
-        timestamp: new Date(),
-        isSelfDeclared: true,
-        seedCount: 0,
-        seededBy: [],
-        isVerified: false,
-        isAdminVerified: false,
-        reactions: {},
-        comments: []
-      };
-      
-      setFeedItems(prev => [newItem, ...prev]);
-      toast.success('Post created successfully! 🎉');
-      
-      // Clear cache to ensure fresh data on next load
-      feedCache.clear();
-      
-    } catch (error) {
-      console.error('Error creating post:', error);
-      toast.error('Failed to create post');
-    }
-  }, []);
-
-  // Get time ago
-  const getTimeAgo = useCallback((date: Date) => {
-    const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
-    if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    const days = Math.floor(diffInHours / 24);
-    if (days < 7) return `${days}d ago`;
-    const weeks = Math.floor(days / 7);
-    if (weeks < 4) return `${weeks}w ago`;
-    return date.toLocaleDateString();
-  }, []);
-
-  // Get reaction count
-  const getReactionCount = useCallback((reactions: Record<string, string[]>, type: string) => {
-    return reactions[type]?.length || 0;
-  }, []);
-
-  // Check if user reacted
-  const hasUserReacted = useCallback((reactions: Record<string, string[]>, type: string) => {
-    return reactions[type]?.includes(user.id) || false;
-  }, [user.id]);
-
-  // Show seed button only for friends and own posts
+  // Should show seed button only for friends and own posts
   const shouldShowSeedButton = useCallback((post: FeedItem) => {
     return post.userId === user.id || friends.has(post.userId);
   }, [user.id, friends]);
@@ -807,9 +737,6 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
           <span>Friends</span>
         </button>
       </div>
-
-      {/* Post Creator */}
-      <FeedPostGenerator user={user} onGeneratePost={handleCreatePost} />
 
       {/* Pull to refresh indicator */}
       {shouldShowRefreshIndicator && (

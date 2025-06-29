@@ -32,13 +32,13 @@ export const generateFeedPost = async (
   specificData?: any
 ): Promise<boolean> => {
   try {
-    console.log('Generating feed post:', { updateType, specificData });
+    console.log('🔄 FEED POST: Generating feed post:', { updateType, specificData });
     
     // Check if we should create a post for this update
     const shouldCreatePost = determineIfPostNeeded(user, previousUser, updateType, specificData);
     
     if (!shouldCreatePost) {
-      console.log('No feed post needed for this update');
+      console.log('❌ FEED POST: No feed post needed for this update');
       return false;
     }
 
@@ -50,15 +50,17 @@ export const generateFeedPost = async (
     
     if (recentPost && shouldGroupWithRecentPost(updateType, recentPost.type)) {
       // Update existing post with new information
+      console.log('🔄 FEED POST: Updating existing post:', recentPost.id);
       await updateExistingPost(recentPost.id, updateData);
       return true;
     } else {
       // Create new feed post
+      console.log('✅ FEED POST: Creating new feed post');
       await createNewFeedPost(user, updateData);
       return true;
     }
   } catch (error) {
-    console.error('Error generating feed post:', error);
+    console.error('❌ FEED POST ERROR:', error);
     return false;
   }
 };
@@ -74,55 +76,84 @@ const determineIfPostNeeded = (
 ): boolean => {
   // Skip posts for users who haven't completed onboarding
   if (!user.username) {
-    console.log('User has not completed onboarding, skipping post');
+    console.log('❌ FEED POST: User has not completed onboarding, skipping post');
     return false;
   }
 
   switch (updateType) {
     case UpdateType.BADGE_EARNED:
       // Always create posts for badges
+      console.log('✅ FEED POST: Creating post for badge earned');
       return true;
       
     case UpdateType.CERTIFICATION_ADDED:
       // Only create posts if there's actual new certification data
       if (!specificData || !specificData.certName) {
+        console.log('❌ FEED POST: No certification name provided');
         return false;
       }
+      console.log('✅ FEED POST: Creating post for certification added:', specificData.certName);
       return true;
       
     case UpdateType.WEALTH_UPDATE:
-      // Only post significant wealth updates (>10% increase)
+      // Only post significant wealth updates (>5% increase)
       if (!previousUser || !previousUser.wealth) {
+        console.log('❌ FEED POST: No previous wealth data to compare');
         return false;
       }
       const prevTotal = previousUser.wealth.total || 0;
       const currentTotal = user.wealth?.total || 0;
       const percentChange = prevTotal > 0 ? ((currentTotal - prevTotal) / prevTotal) * 100 : 0;
-      return percentChange >= 10;
+      console.log(`🔄 FEED POST: Wealth change: ${percentChange.toFixed(2)}% (${prevTotal} -> ${currentTotal})`);
+      return percentChange >= 5;
       
     case UpdateType.ASSET_ADDED:
-      // Always post when an asset is added - removed minimum value requirement
-      return !!specificData;
+      // Always post when an asset is added
+      if (!specificData) {
+        console.log('❌ FEED POST: No asset data provided');
+        return false;
+      }
+      console.log('✅ FEED POST: Creating post for asset added:', specificData.name);
+      return true;
       
     case UpdateType.PROFILE_PICTURE:
       // Only post if this is the first profile picture or a change after 30+ days
-      if (!user.avatar) return false;
-      if (!previousUser?.avatar) return true;
+      if (!user.avatar) {
+        console.log('❌ FEED POST: No avatar to post about');
+        return false;
+      }
+      if (!previousUser?.avatar) {
+        console.log('✅ FEED POST: Creating post for first profile picture');
+        return true;
+      }
       
       // Check if it's been at least 30 days since the last profile picture update
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      return previousUser.lastActive < thirtyDaysAgo;
+      const shouldPost = previousUser.lastActive < thirtyDaysAgo;
+      console.log(`${shouldPost ? '✅' : '❌'} FEED POST: Profile picture update ${shouldPost ? 'will' : 'will not'} create post`);
+      return shouldPost;
       
     case UpdateType.LANGUAGE_ADDED:
       // Post when a new language is added
-      return !!specificData && !!specificData.language;
+      if (!specificData || !specificData.language) {
+        console.log('❌ FEED POST: No language data provided');
+        return false;
+      }
+      console.log('✅ FEED POST: Creating post for language added:', specificData.language);
+      return true;
       
     case UpdateType.EDUCATION_UPDATE:
       // Post when education level changes
-      return !!specificData && !!specificData.education;
+      if (!specificData || !specificData.education) {
+        console.log('❌ FEED POST: No education data provided');
+        return false;
+      }
+      console.log('✅ FEED POST: Creating post for education update:', specificData.education);
+      return true;
       
     default:
+      console.log('❌ FEED POST: Unknown update type:', updateType);
       return false;
   }
 };
@@ -145,10 +176,12 @@ const findRecentUserPost = async (userId: string) => {
   const querySnapshot = await getDocs(feedQuery);
   
   if (querySnapshot.empty) {
+    console.log('🔄 FEED POST: No recent posts found');
     return null;
   }
   
   const doc = querySnapshot.docs[0];
+  console.log('🔄 FEED POST: Found recent post:', doc.id);
   return {
     id: doc.id,
     ...doc.data(),
@@ -162,6 +195,7 @@ const findRecentUserPost = async (userId: string) => {
 const shouldGroupWithRecentPost = (newType: UpdateType, existingType: string): boolean => {
   // Group similar update types
   if (newType === existingType) {
+    console.log('🔄 FEED POST: Grouping with existing post of same type');
     return true;
   }
   
@@ -171,9 +205,12 @@ const shouldGroupWithRecentPost = (newType: UpdateType, existingType: string): b
     [UpdateType.WEALTH_UPDATE, UpdateType.ASSET_ADDED]
   ];
   
-  return relatedGroups.some(group => 
+  const shouldGroup = relatedGroups.some(group => 
     group.includes(newType) && group.includes(existingType as UpdateType)
   );
+  
+  console.log(`${shouldGroup ? '🔄' : '❌'} FEED POST: ${shouldGroup ? 'Grouping' : 'Not grouping'} with existing post`);
+  return shouldGroup;
 };
 
 /**
@@ -287,7 +324,7 @@ const generateUpdateData = (
  */
 const updateExistingPost = async (postId: string, updateData: UpdateData) => {
   // Implementation would update the existing post document
-  console.log('Would update existing post:', postId, updateData);
+  console.log('🔄 FEED POST: Would update existing post:', postId, updateData);
   // This would be implemented with Firestore document update
 };
 
@@ -296,7 +333,7 @@ const updateExistingPost = async (postId: string, updateData: UpdateData) => {
  */
 const createNewFeedPost = async (user: User, updateData: UpdateData) => {
   try {
-    console.log('Creating new feed post:', updateData);
+    console.log('✅ FEED POST: Creating new feed post:', updateData);
     
     const feedItemData = {
       userId: user.id,
@@ -322,10 +359,10 @@ const createNewFeedPost = async (user: User, updateData: UpdateData) => {
     };
     
     const docRef = await addDoc(collection(db, 'feedItems'), feedItemData);
-    console.log('Created new feed post with ID:', docRef.id);
+    console.log('✅ FEED POST: Created new feed post with ID:', docRef.id);
     return true;
   } catch (error) {
-    console.error('Error creating feed post:', error);
+    console.error('❌ FEED POST ERROR:', error);
     return false;
   }
 };
