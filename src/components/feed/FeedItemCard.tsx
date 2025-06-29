@@ -1,20 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Users,
-  MapPin,
-  Clock,
-  UserPlus,
-  Laugh,
-  Angry,
-  Clap,
-  Heart,
-  MessageCircle,
-  Sprout,
-  ChevronDown,
-  ChevronUp,
-  Send
-} from 'lucide-react';
+import { Users, MapPin, Clock, UserPlus, Laugh, Angry, Clapperboard as Clap, Heart, MessageCircle, Sprout, ChevronDown, ChevronUp, Send } from 'lucide-react';
 import { formatNumber, triggerEmojiConfetti } from '../../utils/animations';
 import Button from '../common/Button';
 import Card from '../common/Card';

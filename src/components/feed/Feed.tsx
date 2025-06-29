@@ -1,35 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Activity, 
-  MessageCircle, 
-  Trophy, 
-  TrendingUp, 
-  Award,
-  Users,
-  UserPlus,
-  Eye,
-  Sprout,
-  CheckCircle,
-  MapPin,
-  Clock,
-  Laugh,
-  Angry,
-  Clap,
-  Heart,
-  Plus,
-  Target,
-  Crown,
-  Zap,
-  Globe,
-  Star,
-  Calendar,
-  Send,
-  ChevronDown,
-  ChevronUp,
-  RefreshCw,
-  Loader2
-} from 'lucide-react';
+import { Activity, MessageCircle, Trophy, TrendingUp, Award, Users, UserPlus, Eye, Sprout, CheckCircle, MapPin, Clock, Laugh, Angry, Clapperboard as Clap, Heart, Plus, Target, Crown, Zap, Globe, Star, Calendar, Send, ChevronDown, ChevronUp, RefreshCw, Loader2 } from 'lucide-react';
 import { User } from '../../types';
 import { formatNumber, triggerEmojiConfetti } from '../../utils/animations';
 import Card from '../common/Card';
