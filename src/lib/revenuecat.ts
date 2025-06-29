@@ -1,6 +1,6 @@
 // src/lib/revenuecat.ts
 
-import Purchases from '@revenuecat/purchases-js';
+import { Purchases } from '@revenuecat/purchases-js';
 
 const API_KEY = "rcb_NuecjNKbQSeWwmTaHcWCBZKpGyvS";
 
