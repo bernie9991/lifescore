@@ -26,8 +26,7 @@ import {
   Eye,
   Filter,
   Clock,
-  Loader2,
-  Crown
+  Loader2
 } from 'lucide-react';
 import { User as UserType } from '../../types';
 import { formatCurrency, formatNumber, triggerAchievementConfetti } from '../../utils/animations';
@@ -40,7 +39,6 @@ import AddCertificateModal from '../modals/AddCertificateModal';
 import IntegrationsModal from '../modals/IntegrationsModal';
 import Friends from '../friends/Friends';
 import MyPosts from './MyPosts';
-import SubscriptionCard from './SubscriptionCard';
 import toast from 'react-hot-toast';
 
 interface ProfileProps {
@@ -480,9 +478,6 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
               </div>
             </div>
           </Card>
-
-          {/* Premium Subscription Card */}
-          <SubscriptionCard userId={user.id} />
 
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
