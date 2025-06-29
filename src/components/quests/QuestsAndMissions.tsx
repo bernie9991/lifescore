@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Target, 
@@ -6,25 +6,46 @@ import {
   BookOpen, 
   Trophy
 } from 'lucide-react';
-import { User } from '../../types';
+import { User, Mission } from '../../types';
 import { formatNumber } from '../../utils/animations';
 import MissionCard from './MissionCard';
 import LearningPathCard from './LearningPathCard';
 import HabitTracker from './HabitTracker';
 import Card from '../common/Card';
+import MissionsTab from './MissionsTab';
+import MissionDetailModal from './MissionDetailModal';
+import { getSampleMissions, completeMissionStep } from '../../utils/missionUtils';
+import { useAuth } from '../../hooks/useAuth';
+import toast from 'react-hot-toast';
+import { triggerConfetti } from '../../utils/animations';
 
 interface QuestsAndMissionsProps {
   user: User;
 }
 
 const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
+  const { updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState('habits');
+  const [missions, setMissions] = useState<Mission[]>(user.missions || []);
+  const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const tabs = [
     { id: 'habits', label: 'Habit Tracker', icon: Calendar },
     { id: 'missions', label: 'Missions', icon: Target },
     { id: 'knowledge', label: 'Knowledge Paths', icon: BookOpen }
   ];
+
+  // Initialize missions if not present
+  useEffect(() => {
+    if (!user.missions) {
+      const sampleMissions = getSampleMissions();
+      setMissions(sampleMissions);
+      updateUser({ missions: sampleMissions });
+    } else {
+      setMissions(user.missions);
+    }
+  }, [user.missions, updateUser]);
 
   // Learning paths data
   const learningPaths = [
@@ -72,6 +93,40 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
     }
   ];
 
+  const handleStepComplete = async (missionId: string, stepId: string) => {
+    try {
+      setLoading(true);
+      
+      // Update missions
+      const updatedMissions = await completeMissionStep(user.id, missionId, stepId, missions);
+      setMissions(updatedMissions);
+      
+      // Update user object
+      updateUser({ missions: updatedMissions });
+      
+      // Show success message
+      toast.success('Step completed! 🎉');
+      triggerConfetti();
+      
+      // Update selected mission if open
+      if (selectedMission?.id === missionId) {
+        const updatedMission = updatedMissions.find(m => m.id === missionId);
+        if (updatedMission) {
+          setSelectedMission(updatedMission);
+        }
+      }
+    } catch (error) {
+      console.error('Error completing step:', error);
+      toast.error('Failed to complete step. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewMissionDetails = (mission: Mission) => {
+    setSelectedMission(mission);
+  };
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
@@ -116,25 +171,7 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
 
       {/* Missions Tab */}
       {activeTab === 'missions' && (
-        <div className="space-y-4 md:space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <MissionCard
-              title="Buy Your First Home"
-              description="A step-by-step guide from saving to signing."
-              imageUrl="https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?auto=compress&cs=tinysrgb&w=800"
-            />
-            <MissionCard
-              title="Run a 5k Race"
-              description="Go from the couch to the finish line in just 8 weeks."
-              imageUrl="https://images.pexels.com/photos/2402777/pexels-photo-2402777.jpeg?auto=compress&cs=tinysrgb&w=800"
-            />
-            <MissionCard
-              title="Launch a Side Hustle"
-              description="Turn your passion into a profitable business."
-              imageUrl="https://images.pexels.com/photos/3184360/pexels-photo-3184360.jpeg?auto=compress&cs=tinysrgb&w=800"
-            />
-          </div>
-        </div>
+        <MissionsTab user={user} />
       )}
 
       {/* Knowledge Paths Tab */}
@@ -183,6 +220,16 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
             </div>
           </Card>
         </div>
+      )}
+
+      {/* Mission Detail Modal */}
+      {selectedMission && (
+        <MissionDetailModal
+          mission={selectedMission}
+          isOpen={!!selectedMission}
+          onClose={() => setSelectedMission(null)}
+          onStepComplete={handleStepComplete}
+        />
       )}
     </div>
   );

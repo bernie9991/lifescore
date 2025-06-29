@@ -9,11 +9,18 @@ import Leaderboards from '../leaderboards/Leaderboards';
 import Badges from '../badges/Badges';
 import Friends from '../friends/Friends';
 import Profile from '../profile/Profile';
+import MissionDetailModal from '../quests/MissionDetailModal';
+import { Mission } from '../../types';
+import { completeMissionStep } from '../../utils/missionUtils';
+import toast from 'react-hot-toast';
+import { triggerConfetti } from '../../utils/animations';
 
 const MainAppLayout: React.FC = () => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   // FIXED: Changed default page from 'dashboard' to 'feed'
   const [currentPage, setCurrentPage] = useState('feed');
+  const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
+  const [loading, setLoading] = useState(false);
 
   if (!user) {
     return (
@@ -27,6 +34,39 @@ const MainAppLayout: React.FC = () => {
     setCurrentPage(page);
   };
 
+  const handleViewMission = (mission: Mission) => {
+    setSelectedMission(mission);
+  };
+
+  const handleStepComplete = async (missionId: string, stepId: string) => {
+    try {
+      setLoading(true);
+      
+      // Update missions
+      const updatedMissions = await completeMissionStep(user.id, missionId, stepId, user.missions || []);
+      
+      // Update user object
+      updateUser({ missions: updatedMissions });
+      
+      // Show success message
+      toast.success('Step completed! 🎉');
+      triggerConfetti();
+      
+      // Update selected mission if open
+      if (selectedMission?.id === missionId) {
+        const updatedMission = updatedMissions.find(m => m.id === missionId);
+        if (updatedMission) {
+          setSelectedMission(updatedMission);
+        }
+      }
+    } catch (error) {
+      console.error('Error completing step:', error);
+      toast.error('Failed to complete step. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderContent = () => {
     switch (currentPage) {
       case 'dashboard':
@@ -35,6 +75,8 @@ const MainAppLayout: React.FC = () => {
             user={user} 
             onProfileClick={() => setCurrentPage('profile')}
             onSettingsClick={() => setCurrentPage('profile')}
+            onViewMission={handleViewMission}
+            onViewAllMissions={() => setCurrentPage('quests')}
           />
         );
       case 'feed':
@@ -71,6 +113,16 @@ const MainAppLayout: React.FC = () => {
         {/* Bottom tab bar for mobile */}
         <BottomTabBar currentPage={currentPage} onPageChange={handlePageChange} />
       </div>
+
+      {/* Mission Detail Modal */}
+      {selectedMission && (
+        <MissionDetailModal
+          mission={selectedMission}
+          isOpen={!!selectedMission}
+          onClose={() => setSelectedMission(null)}
+          onStepComplete={handleStepComplete}
+        />
+      )}
     </div>
   );
 };

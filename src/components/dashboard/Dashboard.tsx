@@ -1,19 +1,73 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User } from '../../types';
+import { User, Mission } from '../../types';
 import DashboardHeader from './DashboardHeader';
 import RankingCards from './RankingCards';
 import LifeScoreMeter from './LifeScoreMeter';
 import NudgesPanel from './NudgesPanel';
 import DynamicFactsPanel from './DynamicFactsPanel';
+import MissionDetailModal from '../quests/MissionDetailModal';
+import { completeMissionStep } from '../../utils/missionUtils';
+import { useAuth } from '../../hooks/useAuth';
+import toast from 'react-hot-toast';
+import { triggerConfetti } from '../../utils/animations';
 
 interface DashboardProps {
   user: User;
   onProfileClick: () => void;
   onSettingsClick: () => void;
+  onViewMission?: (mission: Mission) => void;
+  onViewAllMissions?: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, onProfileClick, onSettingsClick }) => {
+const Dashboard: React.FC<DashboardProps> = ({ 
+  user, 
+  onProfileClick, 
+  onSettingsClick,
+  onViewMission,
+  onViewAllMissions
+}) => {
+  const { updateUser } = useAuth();
+  const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleViewMission = (mission: Mission) => {
+    if (onViewMission) {
+      onViewMission(mission);
+    } else {
+      setSelectedMission(mission);
+    }
+  };
+
+  const handleStepComplete = async (missionId: string, stepId: string) => {
+    try {
+      setLoading(true);
+      
+      // Update missions
+      const updatedMissions = await completeMissionStep(user.id, missionId, stepId, user.missions || []);
+      
+      // Update user object
+      updateUser({ missions: updatedMissions });
+      
+      // Show success message
+      toast.success('Step completed! 🎉');
+      triggerConfetti();
+      
+      // Update selected mission if open
+      if (selectedMission?.id === missionId) {
+        const updatedMission = updatedMissions.find(m => m.id === missionId);
+        if (updatedMission) {
+          setSelectedMission(updatedMission);
+        }
+      }
+    } catch (error) {
+      console.error('Error completing step:', error);
+      toast.error('Failed to complete step. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <DashboardHeader user={user} onProfileClick={onProfileClick} onSettingsClick={onSettingsClick} />
@@ -36,7 +90,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onProfileClick, onSettingsC
         {/* Left Column */}
         <div className="lg:col-span-2 space-y-8">
           <RankingCards user={user} />
-          <LifeScoreMeter user={user} />
+          <LifeScoreMeter 
+            user={user} 
+            onViewAllMissions={onViewAllMissions}
+            onViewMission={handleViewMission}
+          />
         </div>
 
         {/* Right Column */}
@@ -44,6 +102,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onProfileClick, onSettingsC
           <NudgesPanel user={user} />
         </div>
       </motion.div>
+
+      {/* Mission Detail Modal */}
+      {selectedMission && (
+        <MissionDetailModal
+          mission={selectedMission}
+          isOpen={!!selectedMission}
+          onClose={() => setSelectedMission(null)}
+          onStepComplete={handleStepComplete}
+        />
+      )}
     </div>
   );
 };

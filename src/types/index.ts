@@ -23,6 +23,7 @@ export interface User {
   wantsIntegrations?: boolean;
   role: string;
   habits?: Habit[];
+  missions?: Mission[];
 }
 
 export interface Habit {
@@ -39,6 +40,36 @@ export interface Habit {
   totalCompletions?: number;
   weeklyProgress?: number[];
   successRate?: number;
+}
+
+export interface Mission {
+  id: string;
+  title: string;
+  description: string;
+  category: 'wealth' | 'knowledge' | 'health' | 'career' | 'personal';
+  difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+  xpReward: number;
+  badgeReward?: string;
+  steps: MissionStep[];
+  startedAt: Date;
+  estimatedDuration: number; // in days
+  status: 'not-started' | 'in-progress' | 'completed' | 'failed';
+  progress: number; // 0-100
+  completedSteps: string[];
+  lastUpdated: Date;
+  deadline?: Date;
+  contributionToLifeScore?: number;
+  weeklyProgress?: number[];
+  comparisonToAverage?: number; // percentage above/below average
+}
+
+export interface MissionStep {
+  id: string;
+  title: string;
+  description: string;
+  isCompleted: boolean;
+  completedAt?: Date;
+  xpReward: number;
 }
 
 export interface WealthData {
