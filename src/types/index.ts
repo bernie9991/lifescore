@@ -22,6 +22,23 @@ export interface User {
   scoreBreakdown?: any;
   wantsIntegrations?: boolean;
   role: string;
+  habits?: Habit[];
+}
+
+export interface Habit {
+  id: string;
+  name: string;
+  emoji: string;
+  category: 'mind' | 'body' | 'work' | 'social';
+  description: string;
+  streak?: number;
+  completedToday?: boolean;
+  lastCompleted?: Date;
+  isPaused?: boolean;
+  selectedAt?: Date;
+  totalCompletions?: number;
+  weeklyProgress?: number[];
+  successRate?: number;
 }
 
 export interface WealthData {

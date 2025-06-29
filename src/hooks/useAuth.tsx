@@ -20,7 +20,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { User } from '../types';
+import { User, Habit } from '../types';
 import { updateUserLifeScore } from '../utils/lifeScoreEngine';
 import { checkBadgeUnlocks, getDefaultBadgesForNewUser, ALL_BADGES } from '../utils/badgeSystem';
 import { generateFeedPost, UpdateType } from '../utils/feedPostGenerator';
@@ -283,6 +283,7 @@ export const useAuthProvider = () => {
     lastActive: new Date(),
     avatarBadge: ALL_BADGES[0],
     wantsIntegrations: false,
+    habits: [],
     role: 'admin'
   });
 
@@ -336,6 +337,7 @@ export const useAuthProvider = () => {
           total: 0
         },
         assets: [],
+        habits: [],
         friends: [],
         createdAt: serverTimestamp(),
         lastActive: serverTimestamp(),
@@ -417,6 +419,7 @@ export const useAuthProvider = () => {
           assets: [],
           badges: [],
           friends: [],
+          habits: [],
           createdAt: new Date(),
           lastActive: new Date(),
           wantsIntegrations: false,
@@ -477,6 +480,7 @@ export const useAuthProvider = () => {
         assets: userData.assets || [],
         badges: userBadges,
         friends: userData.friends || [],
+        habits: userData.habits || [],
         createdAt: userData.createdAt?.toDate() || new Date(),
         lastActive: new Date(),
         avatarBadge: userData.avatarBadgeId ? ALL_BADGES.find(b => b.id === userData.avatarBadgeId) : undefined,
