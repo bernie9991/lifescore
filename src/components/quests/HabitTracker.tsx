@@ -13,7 +13,8 @@ import {
   Star, 
   Flame,
   BarChart3,
-  Loader2
+  Loader2,
+  Trophy
 } from 'lucide-react';
 import { User, Habit } from '../../types';
 import { formatNumber, triggerConfetti, triggerAchievementConfetti } from '../../utils/animations';
