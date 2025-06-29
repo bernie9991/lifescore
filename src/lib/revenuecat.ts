@@ -1,4 +1,4 @@
-import * as Purchases from '@revenuecat/purchases-js';
+import Purchases from '@revenuecat/purchases-js';
 
 // RevenueCat API key
 const REVENUECAT_API_KEY = "rcb_NuecjNKbQSeWwmTaHcWCBZKpGyvS";
