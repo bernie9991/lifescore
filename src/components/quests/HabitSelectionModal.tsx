@@ -96,6 +96,7 @@ const HabitSelectionModal: React.FC<HabitSelectionModalProps> = ({
   }, {} as Record<string, Habit[]>);
 
   const handleToggleHabit = (habit: Habit) => {
+    console.log("Toggling habit:", habit.id);
     setSelectedHabits(prev => {
       const newSet = new Set(prev);
       if (newSet.has(habit.id)) {
@@ -103,6 +104,7 @@ const HabitSelectionModal: React.FC<HabitSelectionModalProps> = ({
       } else {
         newSet.add(habit.id);
       }
+      console.log("New selected habits:", Array.from(newSet));
       return newSet;
     });
   };
@@ -262,32 +264,29 @@ const HabitSelectionModal: React.FC<HabitSelectionModalProps> = ({
                               key={habit.id}
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
+                              onClick={() => handleToggleHabit(habit)}
+                              className={`p-4 border rounded-lg transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'border-blue-500 bg-blue-500/20'
+                                  : 'border-gray-600 hover:border-blue-500/50 bg-gray-800'
+                              }`}
                             >
-                              <Card 
-                                className={`p-4 border transition-all cursor-pointer ${
-                                  isSelected
-                                    ? 'border-blue-500 bg-blue-500/20'
-                                    : 'border-gray-600 hover:border-blue-500/50'
-                                }`}
-                                onClick={() => handleToggleHabit(habit)}
-                              >
-                                <div className="flex items-center space-x-3">
-                                  <div className="text-2xl">{habit.emoji}</div>
-                                  <div className="flex-1">
-                                    <h4 className="font-semibold text-white">{habit.name}</h4>
-                                    <p className="text-gray-400 text-sm">{habit.description}</p>
-                                  </div>
-                                  <div className="flex-shrink-0">
-                                    {isSelected ? (
-                                      <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
-                                        <Check className="w-3 h-3 text-white" />
-                                      </div>
-                                    ) : (
-                                      <div className="w-5 h-5 border-2 border-gray-400 rounded-full" />
-                                    )}
-                                  </div>
+                              <div className="flex items-center space-x-3">
+                                <div className="text-2xl">{habit.emoji}</div>
+                                <div className="flex-1">
+                                  <h4 className="font-semibold text-white">{habit.name}</h4>
+                                  <p className="text-gray-400 text-sm">{habit.description}</p>
                                 </div>
-                              </Card>
+                                <div className="flex-shrink-0">
+                                  {isSelected ? (
+                                    <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                                      <Check className="w-3 h-3 text-white" />
+                                    </div>
+                                  ) : (
+                                    <div className="w-5 h-5 border-2 border-gray-400 rounded-full" />
+                                  )}
+                                </div>
+                              </div>
                             </motion.div>
                           );
                         })}
