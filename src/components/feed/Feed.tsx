@@ -608,12 +608,12 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
         likedBy: []
       };
 
-      // Update Firestore
+      // Update Firestore - use regular Date object instead of serverTimestamp() in arrayUnion
       const postRef = doc(db, 'feedItems', postId);
       await updateDoc(postRef, {
         comments: arrayUnion({
           ...newComment,
-          timestamp: serverTimestamp() // Use server timestamp for Firestore
+          timestamp: new Date() // Use regular Date object for arrayUnion compatibility
         })
       });
 
