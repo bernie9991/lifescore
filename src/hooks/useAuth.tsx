@@ -24,6 +24,7 @@ import { User } from '../types';
 import { updateUserLifeScore } from '../utils/lifeScoreEngine';
 import { checkBadgeUnlocks, getDefaultBadgesForNewUser, ALL_BADGES } from '../utils/badgeSystem';
 import { generateFeedPost, UpdateType } from '../utils/feedPostGenerator';
+import { identifyUser, resetUser } from '../lib/revenuecat';
 import toast from 'react-hot-toast';
 
 // Enhanced timeout configuration
@@ -507,6 +508,9 @@ export const useAuthProvider = () => {
         return;
       }
       
+      // Reset RevenueCat user
+      await resetUser();
+      
       await withTimeout(
         signOut(auth),
         TIMEOUT_CONFIG.AUTH_OPERATIONS,
@@ -544,6 +548,9 @@ export const useAuthProvider = () => {
           const userData = await loadUserData(firebaseUser);
           
           if (userData && isMounted) {
+            // Identify user with RevenueCat
+            await identifyUser(firebaseUser.uid);
+            
             setUser(userData);
             setIsAuthenticated(true);
             clearError();
@@ -617,6 +624,10 @@ export const useAuthProvider = () => {
 
       if (userCredential.user) {
         authLogger.info('Firebase login successful', { userId: userCredential.user.uid });
+        
+        // Identify user with RevenueCat
+        await identifyUser(userCredential.user.uid);
+        
         // Auth state change will handle the rest
         return;
       }
@@ -675,7 +686,10 @@ export const useAuthProvider = () => {
       authLogger.info('Initializing user data in Firestore...');
       await initializeUserData(userCredential.user.uid, name.trim(), email.trim().toLowerCase());
 
-      // Step 4: Load complete user data
+      // Step 4: Identify user with RevenueCat
+      await identifyUser(userCredential.user.uid);
+
+      // Step 5: Load complete user data
       authLogger.info('Loading complete user data...');
       const userData = await loadUserData(userCredential.user);
       
@@ -683,7 +697,7 @@ export const useAuthProvider = () => {
         throw new Error('Failed to load user data after signup');
       }
 
-      // Step 5: Set up badges for celebration
+      // Step 6: Set up badges for celebration
       authLogger.info('Setting up welcome badges...');
       const defaultBadges = getDefaultBadgesForNewUser(userData);
       
@@ -693,7 +707,7 @@ export const useAuthProvider = () => {
         userData.badges = [...userData.badges, ...defaultBadges];
       }
 
-      // Step 6: Set user state
+      // Step 7: Set user state
       setUser(userData);
       setIsAuthenticated(true);
       
