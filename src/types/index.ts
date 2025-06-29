@@ -22,6 +22,7 @@ export interface User {
   scoreBreakdown?: any;
   wantsIntegrations?: boolean;
   role: string;
+  seedBalance?: number; // Add field for seed currency
 }
 
 export interface WealthData {
@@ -98,4 +99,17 @@ export interface ActivityUpdate {
   data?: any;
   createdAt: Date;
   likes: number;
+}
+
+export interface SeedTransaction {
+  id: string;
+  userId: string;
+  amount: number;
+  type: 'purchase' | 'usage' | 'reward';
+  timestamp: Date;
+  metadata?: {
+    postId?: string;
+    packageId?: string;
+    description?: string;
+  };
 }

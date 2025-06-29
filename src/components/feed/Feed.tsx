@@ -31,7 +31,8 @@ import {
   Loader2,
   Filter,
   EyeOff,
-  ThumbsUp
+  ThumbsUp,
+  AlertCircle
 } from 'lucide-react';
 import { User } from '../../types';
 import { formatNumber, triggerEmojiConfetti } from '../../utils/animations';
@@ -40,6 +41,7 @@ import Button from '../common/Button';
 import UserProfileModal from '../modals/UserProfileModal';
 import ChallengeModal from '../modals/ChallengeModal';
 import DynamicFactsPanel from '../dashboard/DynamicFactsPanel';
+import ShopModal from '../modals/ShopModal';
 import { db } from '../../lib/firebase';
 import { 
   collection, 
@@ -146,6 +148,8 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
   const [hiddenPosts, setHiddenPosts] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<string>('all');
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
+  const [isShopOpen, setIsShopOpen] = useState(false);
+  const [lowSeedBalance, setLowSeedBalance] = useState(false);
 
   // Refs for infinite scroll
   const feedContainerRef = useRef<HTMLDivElement>(null);
@@ -477,6 +481,7 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
       const postRef = doc(db, 'feedItems', postId);
       const isSeeded = seededPosts.has(postId);
       
+      // If already seeded, remove seed
       if (isSeeded) {
         await updateDoc(postRef, {
           seededBy: arrayRemove(user.id),
@@ -487,13 +492,37 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
           newSet.delete(postId);
           return newSet;
         });
-        toast.success('Seed removed');
+        
+        // Refund seed
+        const userRef = doc(db, 'users', user.id);
+        await updateDoc(userRef, {
+          seedBalance: increment(1)
+        });
+        
+        toast.success('Seed removed and refunded');
       } else {
+        // Check if user has enough seeds
+        const seedCost = 1; // Cost per seed
+        if ((user.seedBalance || 0) < seedCost) {
+          setLowSeedBalance(true);
+          setIsShopOpen(true);
+          toast.error(`Not enough seeds! You need at least ${seedCost} seeds to boost this post.`);
+          return;
+        }
+        
+        // Add seed
         await updateDoc(postRef, {
           seededBy: arrayUnion(user.id),
           seedCount: (feedItems.find(item => item.id === postId)?.seedCount || 0) + 1
         });
         setSeededPosts(prev => new Set([...prev, postId]));
+        
+        // Deduct seed from balance
+        const userRef = doc(db, 'users', user.id);
+        await updateDoc(userRef, {
+          seedBalance: increment(-seedCost)
+        });
+        
         toast.success('Post seeded! Thanks for verifying! 🌱');
       }
 
@@ -733,6 +762,14 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
     return post.userId === user.id || friends.has(post.userId);
   }, [user.id, friends]);
 
+  // Handle purchase complete
+  const handlePurchaseComplete = useCallback((seedAmount: number) => {
+    // Update user's seed balance in the UI
+    // The actual update is handled in MainAppLayout
+    toast.success(`Added ${seedAmount} seeds to your account! 🌱`);
+    setLowSeedBalance(false);
+  }, []);
+
   // Filter options
   const filterOptions = [
     { id: 'all', label: 'All Updates' },
@@ -776,6 +813,17 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
         </div>
         
         <div className="flex items-center space-x-2">
+          {/* Seeds Balance */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsShopOpen(true)}
+            className="bg-green-500/20 text-green-400 border border-green-500/30"
+          >
+            <Sprout className="w-4 h-4 mr-1" />
+            <span className="font-semibold">{user.seedBalance || 0}</span>
+          </Button>
+          
           {/* Filter Button */}
           <div className="relative group">
             <Button
@@ -856,6 +904,27 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
         </button>
       </div>
 
+      {/* Low Seed Balance Warning */}
+      {lowSeedBalance && (
+        <Card className="p-4 bg-yellow-500/10 border border-yellow-500/30">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-yellow-500 mr-3 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-yellow-300 font-medium">Low seed balance</p>
+              <p className="text-gray-300 text-sm">You need more seeds to boost posts. Get seeds to increase visibility.</p>
+            </div>
+            <Button 
+              size="sm" 
+              onClick={() => setIsShopOpen(true)}
+              className="ml-4 bg-gradient-to-r from-green-500 to-emerald-600"
+            >
+              <Sprout className="w-4 h-4 mr-1" />
+              Get Seeds
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {/* Pull to refresh indicator */}
       {shouldShowRefreshIndicator && (
         <div 
@@ -929,6 +998,8 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
                     showComments={expandedComments.has(item.id)}
                     onToggleComments={() => handleToggleComments(item.id)}
                     onLikeComment={(commentId) => handleLikeComment(item.id, commentId)}
+                    seedCost={1}
+                    userSeedBalance={user.seedBalance || 0}
                   />
                 </motion.div>
               ))}
@@ -1015,6 +1086,13 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
           }}
         />
       )}
+
+      {/* Shop Modal */}
+      <ShopModal
+        isOpen={isShopOpen}
+        onClose={() => setIsShopOpen(false)}
+        onPurchaseComplete={handlePurchaseComplete}
+      />
     </div>
   );
 };

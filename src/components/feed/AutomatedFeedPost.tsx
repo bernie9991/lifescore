@@ -20,7 +20,8 @@ import {
   ChevronUp,
   Send,
   EyeOff,
-  ThumbsUp
+  ThumbsUp,
+  Zap
 } from 'lucide-react';
 import { formatNumber, formatCurrency } from '../../utils/animations';
 import { formatRelativeTime } from '../../utils/feedUtils';
@@ -67,6 +68,8 @@ interface AutomatedFeedPostProps {
   showComments: boolean;
   onToggleComments: () => void;
   onLikeComment?: (commentId: string) => void;
+  seedCost?: number;
+  userSeedBalance?: number;
 }
 
 const AutomatedFeedPost: React.FC<AutomatedFeedPostProps> = ({
@@ -96,9 +99,12 @@ const AutomatedFeedPost: React.FC<AutomatedFeedPostProps> = ({
   isSeeded = false,
   showComments,
   onToggleComments,
-  onLikeComment
+  onLikeComment,
+  seedCost = 1,
+  userSeedBalance = 0
 }) => {
   const [newComment, setNewComment] = useState('');
+  const [showSeedTooltip, setShowSeedTooltip] = useState(false);
 
   // Get icon based on update type
   const getUpdateIcon = () => {
@@ -165,6 +171,19 @@ const AutomatedFeedPost: React.FC<AutomatedFeedPostProps> = ({
   // Check if user has liked a comment
   const hasUserLikedComment = (comment: Comment) => {
     return comment.likedBy?.includes(currentUserId) || false;
+  };
+
+  // Handle seed button click with confirmation if needed
+  const handleSeedClick = () => {
+    if (!isSeeded && userSeedBalance < seedCost) {
+      setShowSeedTooltip(true);
+      setTimeout(() => setShowSeedTooltip(false), 3000);
+      return;
+    }
+    
+    if (onSeed) {
+      onSeed();
+    }
   };
 
   return (
@@ -292,17 +311,34 @@ const AutomatedFeedPost: React.FC<AutomatedFeedPostProps> = ({
         <div className="flex items-center space-x-2">
           {/* Seed Button */}
           {canSeed && onSeed && (
-            <button
-              onClick={onSeed}
-              className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-all ${
-                isSeeded
-                  ? 'bg-green-500/20 text-green-400 border border-green-400/40'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              <Sprout className="w-4 h-4" />
-              <span>{seedCount}</span>
-            </button>
+            <div className="relative">
+              <button
+                onClick={handleSeedClick}
+                className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-all ${
+                  isSeeded
+                    ? 'bg-green-500/20 text-green-400 border border-green-400/40'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                <Sprout className="w-4 h-4" />
+                <span>{seedCount}</span>
+                {!isSeeded && (
+                  <span className="ml-1 text-xs text-gray-400">({seedCost})</span>
+                )}
+              </button>
+              
+              {/* Seed tooltip */}
+              {showSeedTooltip && (
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 bg-gray-800 text-white text-xs rounded-lg p-2 shadow-lg z-10">
+                  <div className="flex items-center text-yellow-400 mb-1">
+                    <Zap className="w-3 h-3 mr-1" />
+                    <span className="font-semibold">Not enough seeds!</span>
+                  </div>
+                  <p className="text-gray-300">You need {seedCost} seeds to boost this post.</p>
+                  <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Comments Button */}

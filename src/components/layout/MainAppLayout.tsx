@@ -9,11 +9,13 @@ import Leaderboards from '../leaderboards/Leaderboards';
 import Badges from '../badges/Badges';
 import Friends from '../friends/Friends';
 import Profile from '../profile/Profile';
+import ShopModal from '../modals/ShopModal';
 
 const MainAppLayout: React.FC = () => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   // FIXED: Changed default page from 'dashboard' to 'feed'
   const [currentPage, setCurrentPage] = useState('feed');
+  const [isShopOpen, setIsShopOpen] = useState(false);
 
   if (!user) {
     return (
@@ -25,6 +27,18 @@ const MainAppLayout: React.FC = () => {
 
   const handlePageChange = (page: string) => {
     setCurrentPage(page);
+  };
+
+  const handleOpenShop = () => {
+    setIsShopOpen(true);
+  };
+
+  const handlePurchaseComplete = (seedAmount: number) => {
+    // Update user's seed balance
+    const currentBalance = user.seedBalance || 0;
+    updateUser({ 
+      seedBalance: currentBalance + seedAmount 
+    });
   };
 
   const renderContent = () => {
@@ -57,7 +71,11 @@ const MainAppLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex">
       {/* Sidebar for desktop */}
-      <Sidebar currentPage={currentPage} onPageChange={handlePageChange} />
+      <Sidebar 
+        currentPage={currentPage} 
+        onPageChange={handlePageChange} 
+        onOpenShop={handleOpenShop}
+      />
       
       {/* Main content area */}
       <div className="flex-1 flex flex-col">
@@ -69,8 +87,19 @@ const MainAppLayout: React.FC = () => {
         </main>
         
         {/* Bottom tab bar for mobile */}
-        <BottomTabBar currentPage={currentPage} onPageChange={handlePageChange} />
+        <BottomTabBar 
+          currentPage={currentPage} 
+          onPageChange={handlePageChange} 
+          onOpenShop={handleOpenShop}
+        />
       </div>
+
+      {/* Shop Modal */}
+      <ShopModal 
+        isOpen={isShopOpen} 
+        onClose={() => setIsShopOpen(false)} 
+        onPurchaseComplete={handlePurchaseComplete}
+      />
     </div>
   );
 };

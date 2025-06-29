@@ -8,20 +8,22 @@ import {
   Activity,
   BarChart3,
   Target,
-  MessageSquare
+  MessageSquare,
+  Sprout
 } from 'lucide-react';
 
 interface BottomTabBarProps {
   currentPage: string;
   onPageChange: (page: string) => void;
+  onOpenShop: () => void;
 }
 
-const BottomTabBar: React.FC<BottomTabBarProps> = ({ currentPage, onPageChange }) => {
+const BottomTabBar: React.FC<BottomTabBarProps> = ({ currentPage, onPageChange, onOpenShop }) => {
   const tabs = [
     { id: 'feed', label: 'Feed', icon: Activity },
     { id: 'quests', label: 'Quests', icon: Target },
-    { id: 'leaderboards', label: 'Leaderboards', icon: Trophy },
-    { id: 'badges', label: 'Badges', icon: Award },
+    { id: 'shop', label: 'Seeds', icon: Sprout, isShop: true },
+    { id: 'leaderboards', label: 'Ranks', icon: Trophy },
     { id: 'profile', label: 'Profile', icon: User },
   ];
 
@@ -32,24 +34,34 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ currentPage, onPageChange }
           <motion.button
             key={tab.id}
             whileTap={{ scale: 0.95 }}
-            onClick={() => onPageChange(tab.id)}
+            onClick={() => tab.isShop ? onOpenShop() : onPageChange(tab.id)}
             className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all min-w-0 flex-1 ${
-              currentPage === tab.id
-                ? 'text-blue-400 bg-blue-900/30'
-                : 'text-gray-400 hover:text-white'
+              tab.isShop 
+                ? 'text-green-400'
+                : currentPage === tab.id
+                  ? 'text-blue-400 bg-blue-900/30'
+                  : 'text-gray-400 hover:text-white'
             }`}
           >
             <tab.icon className={`w-5 h-5 mb-1 ${
-              currentPage === tab.id ? 'text-blue-400' : 'text-gray-400'
+              tab.isShop 
+                ? 'text-green-400'
+                : currentPage === tab.id 
+                  ? 'text-blue-400' 
+                  : 'text-gray-400'
             }`} />
             <span className={`text-xs font-medium truncate ${
-              currentPage === tab.id ? 'text-blue-400' : 'text-gray-400'
+              tab.isShop 
+                ? 'text-green-400'
+                : currentPage === tab.id 
+                  ? 'text-blue-400' 
+                  : 'text-gray-400'
             }`}>
               {tab.label}
             </span>
             
             {/* Active indicator */}
-            {currentPage === tab.id && (
+            {currentPage === tab.id && !tab.isShop && (
               <motion.div
                 layoutId="activeTab"
                 className="absolute -top-0.5 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-blue-400 rounded-full"
