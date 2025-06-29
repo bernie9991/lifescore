@@ -7,12 +7,16 @@ import OnboardingFlow from './components/onboarding/OnboardingFlow';
 import MainAppLayout from './components/layout/MainAppLayout';
 import AdminPanel from './components/admin/AdminPanel';
 import BadgeUnlockModal from './components/badges/BadgeUnlockModal';
+import { initializeRevenueCat } from './lib/revenuecat';
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, isAdmin, newlyUnlockedBadges, clearNewBadges, user } = useAuth();
 
   // FIXED: Check if user needs onboarding based on username being null
   const needsOnboarding = user && user.username === null;
+
+  // Initialize RevenueCat
+  initializeRevenueCat();
 
   console.log('🔍 APP DEBUG: User state:', {
     isAuthenticated,
@@ -122,7 +126,6 @@ function App() {
     <Router>
       <AppContent />
     </Router>
-     
   );
 }
 
