@@ -49,6 +49,7 @@ import { User } from '../../types';
 import { formatNumber, triggerConfetti, triggerAchievementConfetti } from '../../utils/animations';
 import Card from '../common/Card';
 import Button from '../common/Button';
+import MissionCard from './MissionCard';
 import toast from 'react-hot-toast';
 
 interface QuestsAndMissionsProps {
@@ -164,6 +165,25 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
     { id: 'habits', label: 'Habit Tracker', icon: Calendar },
     { id: 'missions', label: 'Missions', icon: Target },
     { id: 'knowledge', label: 'Knowledge Paths', icon: BookOpen }
+  ];
+
+  // Mission cards data with high-quality Pexels images
+  const missionCards = [
+    {
+      title: "Buy Your First Home",
+      description: "A step-by-step guide from saving to signing.",
+      imageUrl: "https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?auto=compress&cs=tinysrgb&w=800&h=600&dpr=1"
+    },
+    {
+      title: "Run a 5k Race",
+      description: "Go from the couch to the finish line in just 8 weeks.",
+      imageUrl: "https://images.pexels.com/photos/2402777/pexels-photo-2402777.jpeg?auto=compress&cs=tinysrgb&w=800&h=600&dpr=1"
+    },
+    {
+      title: "Launch a Side Hustle",
+      description: "Turn your passion into a profitable business.",
+      imageUrl: "https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=800&h=600&dpr=1"
+    }
   ];
 
   // Load user habits from localStorage on component mount
@@ -604,29 +624,56 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
       {/* Missions Tab */}
       {activeTab === 'missions' && (
         <div className="space-y-4 md:space-y-6">
-          {/* Empty Missions State */}
-          <Card className="p-8 text-center bg-gradient-to-br from-gray-800/50 to-gray-900/50">
-            <div className="max-w-md mx-auto">
-              <div className="w-24 h-24 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Target className="w-12 h-12 text-purple-400" />
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl md:text-2xl font-bold text-white">Upcoming Missions</h2>
+            <div className="text-sm text-gray-400">
+              More missions launching soon!
+            </div>
+          </div>
+
+          {/* Mission Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {missionCards.map((mission, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <MissionCard
+                  title={mission.title}
+                  description={mission.description}
+                  imageUrl={mission.imageUrl}
+                />
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Coming Soon Info */}
+          <Card className="p-6 bg-gradient-to-r from-purple-900/20 to-pink-900/20 border-purple-500/30 text-center">
+            <div className="max-w-2xl mx-auto">
+              <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Rocket className="w-8 h-8 text-white" />
               </div>
-              
-              <h3 className="text-2xl font-bold text-white mb-4">
-                No missions available yet
+              <h3 className="text-2xl font-bold text-white mb-3">
+                Missions Are Coming Soon!
               </h3>
-              
-              <p className="text-gray-400 mb-6 leading-relaxed">
-                Missions are coming soon! Complete your profile and earn badges to unlock special missions.
+              <p className="text-gray-300 leading-relaxed mb-4">
+                We're crafting exciting, step-by-step missions to help you achieve your biggest life goals. 
+                Each mission will include detailed guides, progress tracking, and exclusive rewards.
               </p>
-              
-              <div className="space-y-3">
-                <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
-                  <Trophy className="w-4 h-4" />
-                  <span>Missions will offer special rewards</span>
+              <div className="flex items-center justify-center space-x-6 text-sm text-gray-400">
+                <div className="flex items-center space-x-2">
+                  <Target className="w-4 h-4" />
+                  <span>Goal-oriented challenges</span>
                 </div>
-                <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
-                  <Calendar className="w-4 h-4" />
-                  <span>Check back soon for new challenges</span>
+                <div className="flex items-center space-x-2">
+                  <Trophy className="w-4 h-4" />
+                  <span>Exclusive rewards</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Users className="w-4 h-4" />
+                  <span>Community support</span>
                 </div>
               </div>
             </div>
