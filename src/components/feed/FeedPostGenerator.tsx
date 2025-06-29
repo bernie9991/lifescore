@@ -7,7 +7,7 @@ import {
   Home, 
   Globe, 
   Camera, 
-  User, 
+  User as UserIcon, 
   Clock, 
   MapPin, 
   MessageCircle, 
@@ -22,7 +22,10 @@ import {
   Settings,
   Filter,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Plus,
+  Trophy,
+  Star
 } from 'lucide-react';
 import { User } from '../../types';
 import { formatNumber, formatCurrency } from '../../utils/animations';
