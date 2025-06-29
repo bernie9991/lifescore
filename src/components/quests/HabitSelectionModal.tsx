@@ -11,35 +11,19 @@ import {
   Save,
   Loader2
 } from 'lucide-react';
-import { User } from '../../types';
+import { User, Habit } from '../../types';
 import Button from '../common/Button';
 import Card from '../common/Card';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
 import { db } from '../../lib/firebase';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 
 interface HabitSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onHabitsSelected: (habits: Habit[]) => void;
   currentHabits: Habit[];
-}
-
-export interface Habit {
-  id: string;
-  name: string;
-  emoji: string;
-  category: 'mind' | 'body' | 'work' | 'social';
-  description: string;
-  streak?: number;
-  completedToday?: boolean;
-  lastCompleted?: Date;
-  isPaused?: boolean;
-  selectedAt?: Date;
-  totalCompletions?: number;
-  weeklyProgress?: number[];
-  successRate?: number;
 }
 
 const HabitSelectionModal: React.FC<HabitSelectionModalProps> = ({ 
@@ -91,11 +75,9 @@ const HabitSelectionModal: React.FC<HabitSelectionModalProps> = ({
 
   // Initialize selected habits based on current habits
   useEffect(() => {
-    if (currentHabits.length > 0) {
+    if (isOpen) {
       const currentHabitIds = new Set(currentHabits.map(habit => habit.id));
       setSelectedHabits(currentHabitIds);
-    } else {
-      setSelectedHabits(new Set());
     }
   }, [currentHabits, isOpen]);
 
@@ -113,81 +95,16 @@ const HabitSelectionModal: React.FC<HabitSelectionModalProps> = ({
     return acc;
   }, {} as Record<string, Habit[]>);
 
-  const handleToggleHabit = async (habit: Habit) => {
-    try {
-      setSaving(true);
-      
-      // Update local state first for immediate feedback
-      const newSelectedHabits = new Set(selectedHabits);
-      const isSelected = selectedHabits.has(habit.id);
-      
-      if (isSelected) {
-        newSelectedHabits.delete(habit.id);
+  const handleToggleHabit = (habit: Habit) => {
+    setSelectedHabits(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(habit.id)) {
+        newSet.delete(habit.id);
       } else {
-        newSelectedHabits.add(habit.id);
+        newSet.add(habit.id);
       }
-      
-      setSelectedHabits(newSelectedHabits);
-      
-      // Update in Firestore
-      if (user?.id) {
-        const userDocRef = doc(db, 'users', user.id);
-        
-        if (isSelected) {
-          // Remove habit
-          await updateDoc(userDocRef, {
-            'habits': arrayRemove(habit)
-          });
-          toast.success(`Removed "${habit.name}" from your habits`);
-        } else {
-          // Add habit with initial properties
-          const newHabit: Habit = {
-            ...habit,
-            streak: 0,
-            completedToday: false,
-            selectedAt: new Date(),
-            totalCompletions: 0,
-            weeklyProgress: new Array(7).fill(0),
-            successRate: 0
-          };
-          
-          await updateDoc(userDocRef, {
-            'habits': arrayUnion(newHabit)
-          });
-          toast.success(`Added "${habit.name}" to your habits`);
-        }
-        
-        // Update local user state
-        const updatedHabits = isSelected
-          ? currentHabits.filter(h => h.id !== habit.id)
-          : [...currentHabits, {
-              ...habit,
-              streak: 0,
-              completedToday: false,
-              selectedAt: new Date(),
-              totalCompletions: 0,
-              weeklyProgress: new Array(7).fill(0),
-              successRate: 0
-            }];
-        
-        updateUser({ habits: updatedHabits });
-        onHabitsSelected(updatedHabits);
-      }
-    } catch (error) {
-      console.error('Error updating habit:', error);
-      toast.error('Failed to update habit. Please try again.');
-      
-      // Revert local state on error
-      const revertedHabits = new Set(selectedHabits);
-      if (selectedHabits.has(habit.id)) {
-        revertedHabits.delete(habit.id);
-      } else {
-        revertedHabits.add(habit.id);
-      }
-      setSelectedHabits(revertedHabits);
-    } finally {
-      setSaving(false);
-    }
+      return newSet;
+    });
   };
 
   const handleSaveAll = async () => {
@@ -202,15 +119,26 @@ const HabitSelectionModal: React.FC<HabitSelectionModalProps> = ({
       // Create array of selected habits
       const selectedHabitObjects = availableHabits
         .filter(habit => selectedHabits.has(habit.id))
-        .map(habit => ({
-          ...habit,
-          streak: 0,
-          completedToday: false,
-          selectedAt: new Date(),
-          totalCompletions: 0,
-          weeklyProgress: new Array(7).fill(0),
-          successRate: 0
-        }));
+        .map(habit => {
+          // Check if habit already exists in currentHabits
+          const existingHabit = currentHabits.find(h => h.id === habit.id);
+          
+          if (existingHabit) {
+            // Keep existing habit data
+            return existingHabit;
+          } else {
+            // Create new habit with default values
+            return {
+              ...habit,
+              streak: 0,
+              completedToday: false,
+              selectedAt: new Date(),
+              totalCompletions: 0,
+              weeklyProgress: new Array(7).fill(0),
+              successRate: 0
+            };
+          }
+        });
       
       // Update in Firestore
       const userDocRef = doc(db, 'users', user.id);
@@ -328,7 +256,6 @@ const HabitSelectionModal: React.FC<HabitSelectionModalProps> = ({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {categoryHabits.map((habit) => {
                           const isSelected = selectedHabits.has(habit.id);
-                          const isAlreadyAdded = currentHabits.some(h => h.id === habit.id);
                           
                           return (
                             <motion.div
@@ -351,10 +278,10 @@ const HabitSelectionModal: React.FC<HabitSelectionModalProps> = ({
                                     <p className="text-gray-400 text-sm">{habit.description}</p>
                                   </div>
                                   <div className="flex-shrink-0">
-                                    {saving ? (
-                                      <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-                                    ) : isSelected ? (
-                                      <Check className="w-5 h-5 text-blue-400" />
+                                    {isSelected ? (
+                                      <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                                        <Check className="w-3 h-3 text-white" />
+                                      </div>
                                     ) : (
                                       <div className="w-5 h-5 border-2 border-gray-400 rounded-full" />
                                     )}

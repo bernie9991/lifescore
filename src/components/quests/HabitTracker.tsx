@@ -15,16 +15,15 @@ import {
   BarChart3,
   Loader2
 } from 'lucide-react';
-import { User } from '../../types';
+import { User, Habit } from '../../types';
 import { formatNumber, triggerConfetti, triggerAchievementConfetti } from '../../utils/animations';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
 import { db } from '../../lib/firebase';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import HabitSelectionModal from './HabitSelectionModal';
-import { Habit } from './HabitSelectionModal';
 
 interface HabitTrackerProps {
   user: User;
@@ -37,7 +36,7 @@ const HabitTracker: React.FC<HabitTrackerProps> = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [processingHabitId, setProcessingHabitId] = useState<string | null>(null);
 
-  // Load user habits from localStorage on component mount
+  // Load user habits from user object
   useEffect(() => {
     if (user?.habits) {
       setHabits(user.habits);
@@ -70,7 +69,7 @@ const HabitTracker: React.FC<HabitTrackerProps> = ({ user }) => {
       
       const updatedHabits = habits.map(habit => {
         if (habit.id === habitId && !habit.completedToday && !habit.isPaused) {
-          const newStreak = habit.streak + 1;
+          const newStreak = (habit.streak || 0) + 1;
           const newTotalCompletions = (habit.totalCompletions || 0) + 1;
           
           // Calculate success rate
@@ -143,7 +142,7 @@ const HabitTracker: React.FC<HabitTrackerProps> = ({ user }) => {
       if (user?.id) {
         const userDocRef = doc(db, 'users', user.id);
         await updateDoc(userDocRef, {
-          'habits': arrayRemove(habit)
+          'habits': updatedHabits
         });
         
         // Update user object
@@ -441,6 +440,28 @@ const HabitTracker: React.FC<HabitTrackerProps> = ({ user }) => {
           </div>
         </Card>
       )}
+
+      {/* Streak Milestones */}
+      <Card className="p-3 md:p-4 bg-gradient-to-r from-orange-900/20 to-red-900/20 border-orange-500/30">
+        <h3 className="text-base md:text-lg font-bold text-white mb-2 md:mb-3 flex items-center">
+          <Trophy className="w-4 h-4 md:w-5 md:h-5 text-yellow-400 mr-2" />
+          Streak Milestones
+        </h3>
+        <div className="grid grid-cols-3 gap-2 md:gap-4">
+          <div className="text-center p-2 md:p-3 bg-gray-900/50 rounded-lg">
+            <div className="text-lg md:text-xl font-bold text-yellow-400">7</div>
+            <div className="text-xs text-gray-400">Rookie</div>
+          </div>
+          <div className="text-center p-2 md:p-3 bg-gray-900/50 rounded-lg">
+            <div className="text-lg md:text-xl font-bold text-orange-400">30</div>
+            <div className="text-xs text-gray-400">Master</div>
+          </div>
+          <div className="text-center p-2 md:p-3 bg-gray-900/50 rounded-lg">
+            <div className="text-lg md:text-xl font-bold text-red-400">100</div>
+            <div className="text-xs text-gray-400">Legend</div>
+          </div>
+        </div>
+      </Card>
 
       {/* Habit Selection Modal */}
       <HabitSelectionModal

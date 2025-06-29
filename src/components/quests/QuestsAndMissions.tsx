@@ -11,6 +11,7 @@ import { formatNumber } from '../../utils/animations';
 import MissionCard from './MissionCard';
 import LearningPathCard from './LearningPathCard';
 import HabitTracker from './HabitTracker';
+import Card from '../common/Card';
 
 interface QuestsAndMissionsProps {
   user: User;
