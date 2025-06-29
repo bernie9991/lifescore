@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { User } from '../../types';
 import { formatNumber } from '../../utils/animations';
+import Card from '../common/Card';
 import MissionCard from './MissionCard';
 import LearningPathCard from './LearningPathCard';
 import HabitTracker from './HabitTracker';
