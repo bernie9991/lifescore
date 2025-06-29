@@ -208,7 +208,7 @@ const HabitSelectionModal: React.FC<HabitSelectionModalProps> = ({
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="relative bg-gray-800 rounded-2xl border border-gray-700 w-full max-w-4xl max-h-[90vh] overflow-hidden"
+            className="relative bg-gray-800 rounded-2xl border border-gray-700 w-full max-w-4xl flex flex-col max-h-[90vh]"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-700">
@@ -242,7 +242,7 @@ const HabitSelectionModal: React.FC<HabitSelectionModalProps> = ({
             </div>
 
             {/* Content - Scrollable */}
-            <div className="p-4 md:p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+            <div className="p-4 md:p-6 space-y-6 overflow-y-auto flex-grow">
               {Object.entries(groupedHabits).length > 0 ? (
                 Object.entries(groupedHabits).map(([category, categoryHabits]) => {
                   const CategoryIcon = getHabitCategoryIcon(category as Habit['category']);
@@ -305,8 +305,8 @@ const HabitSelectionModal: React.FC<HabitSelectionModalProps> = ({
               )}
             </div>
 
-            {/* Footer */}
-            <div className="p-4 md:p-6 border-t border-gray-700 bg-gray-900/50">
+            {/* Footer - Fixed at bottom */}
+            <div className="p-4 md:p-6 border-t border-gray-700 bg-gray-900/50 sticky bottom-0 left-0 right-0">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-400">
                   {selectedHabits.size} habit{selectedHabits.size !== 1 ? 's' : ''} selected
