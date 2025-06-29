@@ -7,7 +7,6 @@ import OnboardingFlow from './components/onboarding/OnboardingFlow';
 import MainAppLayout from './components/layout/MainAppLayout';
 import AdminPanel from './components/admin/AdminPanel';
 import BadgeUnlockModal from './components/badges/BadgeUnlockModal';
-import { initializeRevenueCat } from './lib/revenuecat';
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, isAdmin, newlyUnlockedBadges, clearNewBadges, user } = useAuth();
@@ -22,13 +21,6 @@ const AppContent: React.FC = () => {
     username: user?.username,
     needsOnboarding
   });
-
-  // Initialize RevenueCat
-  React.useEffect(() => {
-    if (isAuthenticated) {
-      initializeRevenueCat();
-    }
-  }, [isAuthenticated]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
@@ -130,6 +122,7 @@ function App() {
     <Router>
       <AppContent />
     </Router>
+     
   );
 }
 

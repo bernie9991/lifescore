@@ -10,19 +10,16 @@ import {
   Activity,
   BarChart3,
   Target,
-  MessageSquare,
-  Sprout,
-  CreditCard
+  MessageSquare
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 interface SidebarProps {
   currentPage: string;
   onPageChange: (page: string) => void;
-  onOpenShop: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange, onOpenShop }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
   const { user, logout } = useAuth();
 
   const menuItems = [
@@ -121,22 +118,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange, onOpenShop
             >
               <MessageSquare className="w-5 h-5" />
               <span>My Posts</span>
-            </motion.button>
-          </li>
-          
-          {/* Shop Button */}
-          <li className="mt-6">
-            <motion.button
-              whileHover={{ x: 4, scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={onOpenShop}
-              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700"
-            >
-              <Sprout className="w-5 h-5" />
-              <span>Get Seeds</span>
-              <div className="ml-auto bg-white/20 px-2 py-0.5 rounded text-xs font-bold">
-                {user?.seedBalance || 0}
-              </div>
             </motion.button>
           </li>
         </ul>
