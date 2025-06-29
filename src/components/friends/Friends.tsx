@@ -84,7 +84,7 @@ const Friends: React.FC<FriendsProps> = ({ user }) => {
     { emoji: '😊', label: 'Smile' }
   ];
 
-  // Load friends data
+  // Load user habits from localStorage on component mount
   useEffect(() => {
     if (!user?.id) return;
 
@@ -199,7 +199,8 @@ const Friends: React.FC<FriendsProps> = ({ user }) => {
       setSearchResults(results);
       
       if (results.length === 0) {
-        toast.info('No user found with that username');
+        // FIXED: Changed toast.info to toast (neutral message)
+        toast('No user found with that username');
       }
     } catch (error) {
       console.error('Error searching users:', error);
@@ -217,7 +218,8 @@ const Friends: React.FC<FriendsProps> = ({ user }) => {
       const currentFriends = userData?.friends || [];
       
       if (currentFriends.includes(recipientId)) {
-        toast.info('You are already friends with this user');
+        // FIXED: Changed toast.info to toast
+        toast('You are already friends with this user');
         return;
       }
 
@@ -230,7 +232,8 @@ const Friends: React.FC<FriendsProps> = ({ user }) => {
       
       const existingSnapshot = await getDocs(existingRequests);
       if (!existingSnapshot.empty) {
-        toast.info('Friend request already sent');
+        // FIXED: Changed toast.info to toast
+        toast('Friend request already sent');
         return;
       }
 
