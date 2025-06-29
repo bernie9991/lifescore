@@ -1,291 +1,237 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { 
   Target, 
-  Plus, 
-  Filter, 
-  Search, 
-  TrendingUp, 
-  Award, 
+  Calendar, 
+  BookOpen, 
+  Trophy,
   Clock,
-  Loader2
+  Award,
+  Users,
+  CheckCircle,
+  ChevronRight
 } from 'lucide-react';
-import { User, Mission } from '../../types';
-import { getSampleMissions, completeMissionStep } from '../../utils/missionUtils';
+import { User } from '../../types';
 import Card from '../common/Card';
 import Button from '../common/Button';
-import MissionCard from './MissionCard';
-import MissionDetailModal from './MissionDetailModal';
-import toast from 'react-hot-toast';
-import { useAuth } from '../../hooks/useAuth';
-import { db } from '../../lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
-import { triggerConfetti } from '../../utils/animations';
 
 interface MissionsTabProps {
   user: User;
 }
 
 const MissionsTab: React.FC<MissionsTabProps> = ({ user }) => {
-  const { updateUser } = useAuth();
-  const [missions, setMissions] = useState<Mission[]>(user.missions || getSampleMissions());
-  const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
-  
-  // Load missions from user object
-  useEffect(() => {
-    if (user?.missions) {
-      setMissions(user.missions);
-    } else {
-      // Use sample missions for demo
-      const sampleMissions = getSampleMissions();
-      setMissions(sampleMissions);
-      
-      // Update user object with sample missions
-      updateUser({ missions: sampleMissions });
+  // Sample mission data for visual representation
+  const sampleMissions = [
+    {
+      id: 'mission-1',
+      title: 'Buy Your First Home',
+      description: 'A step-by-step guide from saving to signing.',
+      imageUrl: 'https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?auto=compress&cs=tinysrgb&w=800',
+      progress: 60,
+      totalSteps: 5,
+      completedSteps: 3,
+      timeRemaining: '90 days',
+      xpReward: 5000,
+      badgeReward: 'Homeowner',
+      category: 'wealth'
+    },
+    {
+      id: 'mission-2',
+      title: 'Run a 5k Race',
+      description: 'Go from the couch to the finish line in just 8 weeks.',
+      imageUrl: 'https://images.pexels.com/photos/2402777/pexels-photo-2402777.jpeg?auto=compress&cs=tinysrgb&w=800',
+      progress: 40,
+      totalSteps: 5,
+      completedSteps: 2,
+      timeRemaining: '30 days',
+      xpReward: 2000,
+      category: 'health'
+    },
+    {
+      id: 'mission-3',
+      title: 'Launch a Side Hustle',
+      description: 'Turn your passion into a profitable business.',
+      imageUrl: 'https://images.pexels.com/photos/3184360/pexels-photo-3184360.jpeg?auto=compress&cs=tinysrgb&w=800',
+      progress: 75,
+      totalSteps: 4,
+      completedSteps: 3,
+      timeRemaining: '60 days',
+      xpReward: 3000,
+      badgeReward: 'Entrepreneur',
+      category: 'career'
     }
-  }, [user.missions, updateUser]);
-  
-  // Filter missions
-  const filteredMissions = missions.filter(mission => {
-    // Filter by status
-    if (filter !== 'all' && mission.status !== filter) {
-      return false;
-    }
-    
-    // Filter by search term
-    if (searchTerm && !mission.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
-        !mission.description.toLowerCase().includes(searchTerm.toLowerCase())) {
-      return false;
-    }
-    
-    return true;
-  });
-  
-  // Sort missions: in-progress first, then not-started, then completed, then failed
-  const sortedMissions = [...filteredMissions].sort((a, b) => {
-    const statusOrder: Record<string, number> = {
-      'in-progress': 0,
-      'not-started': 1,
-      'completed': 2,
-      'failed': 3
-    };
-    
-    return statusOrder[a.status] - statusOrder[b.status];
-  });
-  
-  const handleStepComplete = async (missionId: string, stepId: string) => {
-    try {
-      setLoading(true);
-      
-      // Update missions
-      const updatedMissions = await completeMissionStep(user.id, missionId, stepId, missions);
-      setMissions(updatedMissions);
-      
-      // Update user object
-      updateUser({ missions: updatedMissions });
-      
-      // Show success message
-      toast.success('Step completed! 🎉');
-      triggerConfetti();
-      
-      // Update selected mission if open
-      if (selectedMission?.id === missionId) {
-        const updatedMission = updatedMissions.find(m => m.id === missionId);
-        if (updatedMission) {
-          setSelectedMission(updatedMission);
-        }
-      }
-    } catch (error) {
-      console.error('Error completing step:', error);
-      toast.error('Failed to complete step. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const handleViewMissionDetails = (mission: Mission) => {
-    setSelectedMission(mission);
-  };
-  
-  const filterOptions = [
-    { id: 'all', label: 'All Missions' },
-    { id: 'in-progress', label: 'In Progress' },
-    { id: 'completed', label: 'Completed' },
-    { id: 'not-started', label: 'Not Started' }
   ];
-  
-  // Calculate mission stats
-  const totalMissions = missions.length;
-  const completedMissions = missions.filter(m => m.status === 'completed').length;
-  const inProgressMissions = missions.filter(m => m.status === 'in-progress').length;
-  const notStartedMissions = missions.filter(m => m.status === 'not-started').length;
-  
-  // Calculate total XP earned from missions
-  const totalXPEarned = missions.reduce((total, mission) => {
-    if (mission.status === 'completed') {
-      return total + mission.xpReward;
+
+  // Get category icon
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'wealth': return '💰';
+      case 'health': return '💪';
+      case 'career': return '💼';
+      default: return '🎯';
     }
-    
-    // For in-progress missions, add XP from completed steps
-    const completedStepsXP = mission.steps
-      .filter(step => mission.completedSteps.includes(step.id))
-      .reduce((sum, step) => sum + step.xpReward, 0);
-    
-    return total + completedStepsXP;
-  }, 0);
+  };
+
+  // Get status color based on progress
+  const getStatusColor = (progress: number) => {
+    if (progress >= 75) return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+    if (progress >= 50) return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+    if (progress >= 25) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+    return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+  };
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Header with Stats */}
+      {/* Mission Stats Overview */}
       <Card className="p-4 md:p-6 bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-blue-400/30">
         <div className="flex flex-col md:flex-row items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-white mb-2 flex items-center">
               <Target className="w-5 h-5 text-blue-400 mr-2" />
-              Your Missions
+              Mission Center
             </h2>
             <p className="text-gray-300 text-sm">
-              Complete missions to earn XP and badges
+              Complete missions to earn XP and special badges
             </p>
           </div>
           
           <div className="flex flex-wrap gap-3 mt-4 md:mt-0">
             <div className="bg-gray-800 p-3 rounded-lg text-center">
-              <div className="text-xl font-bold text-blue-400">{totalMissions}</div>
+              <div className="text-xl font-bold text-blue-400">3</div>
               <div className="text-xs text-gray-400">Total</div>
             </div>
             
             <div className="bg-gray-800 p-3 rounded-lg text-center">
-              <div className="text-xl font-bold text-green-400">{completedMissions}</div>
+              <div className="text-xl font-bold text-green-400">0</div>
               <div className="text-xs text-gray-400">Completed</div>
             </div>
             
             <div className="bg-gray-800 p-3 rounded-lg text-center">
-              <div className="text-xl font-bold text-yellow-400">{inProgressMissions}</div>
+              <div className="text-xl font-bold text-yellow-400">3</div>
               <div className="text-xs text-gray-400">In Progress</div>
             </div>
             
             <div className="bg-gray-800 p-3 rounded-lg text-center">
-              <div className="text-xl font-bold text-purple-400">{totalXPEarned}</div>
-              <div className="text-xs text-gray-400">XP Earned</div>
+              <div className="text-xl font-bold text-purple-400">10,000</div>
+              <div className="text-xs text-gray-400">XP Available</div>
             </div>
           </div>
         </div>
       </Card>
 
-      {/* Controls */}
-      <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4 items-center">
-        {/* Search */}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 md:w-5 md:h-5" />
-          <input
-            type="text"
-            placeholder="Search missions..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 md:py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-base"
-          />
-        </div>
-
-        {/* Filter */}
-        <div className="flex items-center space-x-2">
-          <Filter className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 md:px-4 md:py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-base"
+      {/* Missions Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {sampleMissions.map((mission) => (
+          <motion.div
+            key={mission.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative rounded-2xl overflow-hidden border border-gray-700 bg-gray-800 flex flex-col h-full"
           >
-            {filterOptions.map(option => (
-              <option key={option.id} value={option.id}>{option.label}</option>
-            ))}
-          </select>
-        </div>
-        
-        {/* Add Mission Button - Disabled for demo */}
-        <Button
-          variant="secondary"
-          icon={Plus}
-          disabled
-          className="md:ml-auto"
-        >
-          New Mission
-        </Button>
+            {/* Image Section */}
+            <div className="relative h-48">
+              {/* Background Image */}
+              <div 
+                className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                style={{ backgroundImage: `url(${mission.imageUrl})` }}
+              />
+              
+              {/* Dark Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
+              
+              {/* Coming Soon Badge */}
+              <div className="absolute top-4 right-4 z-10">
+                <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-black font-bold px-3 py-1 rounded-full text-sm shadow-lg">
+                  Coming Soon
+                </div>
+              </div>
+              
+              {/* Category Icon */}
+              <div className="absolute top-4 left-4 z-10">
+                <div className="bg-gray-900/70 backdrop-blur-sm text-white font-bold px-3 py-1 rounded-full text-sm shadow-lg">
+                  <span className="mr-1">{getCategoryIcon(mission.category)}</span>
+                  <span className="capitalize">{mission.category}</span>
+                </div>
+              </div>
+              
+              {/* Mission Title */}
+              <div className="absolute bottom-4 left-4 right-4 z-10">
+                <h3 className="text-xl font-bold text-white mb-1">{mission.title}</h3>
+                <p className="text-gray-300 text-sm line-clamp-2">{mission.description}</p>
+              </div>
+            </div>
+            
+            {/* Mission Details */}
+            <div className="p-4 flex-grow flex flex-col">
+              {/* Progress Section */}
+              <div className="mb-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-300">Progress</span>
+                  <span className="text-white font-semibold">
+                    {mission.completedSteps}/{mission.totalSteps} steps
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-500 rounded-full"
+                    style={{ width: `${mission.progress}%` }}
+                  />
+                </div>
+              </div>
+              
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                <div className="bg-gray-900 p-2 rounded-lg">
+                  <div className="flex items-center text-xs text-gray-400 mb-1">
+                    <Clock className="w-3 h-3 mr-1" />
+                    Time Remaining
+                  </div>
+                  <div className="text-sm font-semibold text-white">{mission.timeRemaining}</div>
+                </div>
+                
+                <div className="bg-gray-900 p-2 rounded-lg">
+                  <div className="flex items-center text-xs text-gray-400 mb-1">
+                    <Award className="w-3 h-3 mr-1" />
+                    XP Reward
+                  </div>
+                  <div className="text-sm font-semibold text-yellow-400">+{mission.xpReward} XP</div>
+                </div>
+              </div>
+              
+              {/* Next Milestones */}
+              <div className="bg-gray-900 p-3 rounded-lg mb-4">
+                <h4 className="text-sm font-medium text-white mb-2 flex items-center">
+                  <CheckCircle className="w-3 h-3 text-blue-400 mr-1" />
+                  Next Milestone
+                </h4>
+                <div className="text-xs text-gray-300">
+                  {mission.id === 'mission-1' && 'Find a real estate agent and start house hunting'}
+                  {mission.id === 'mission-2' && 'Run 2 miles without stopping'}
+                  {mission.id === 'mission-3' && 'Build a portfolio project to showcase your skills'}
+                </div>
+              </div>
+              
+              {/* Status Badge */}
+              <div className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(mission.progress)} self-start mb-4`}>
+                {mission.progress >= 75 ? 'Near Completion' : 
+                 mission.progress >= 50 ? 'Good Progress' : 
+                 mission.progress >= 25 ? 'In Progress' : 'Just Started'}
+              </div>
+              
+              {/* View Details Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-auto w-full justify-center"
+                icon={ChevronRight}
+              >
+                View Details
+              </Button>
+            </div>
+          </motion.div>
+        ))}
       </div>
 
-      {/* Missions List */}
-      {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-400" />
-            <div className="text-gray-300">Loading missions...</div>
-          </div>
-        </div>
-      ) : sortedMissions.length > 0 ? (
-        <div className="space-y-4">
-          {sortedMissions.map((mission) => (
-            <MissionCard
-              key={mission.id}
-              mission={mission}
-              onStepComplete={handleStepComplete}
-              onViewDetails={handleViewMissionDetails}
-            />
-          ))}
-        </div>
-      ) : (
-        <Card className="p-8 text-center">
-          <div className="max-w-md mx-auto">
-            <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Target className="w-8 h-8 text-gray-400" />
-            </div>
-            
-            <h3 className="text-xl font-bold text-white mb-3">No missions found</h3>
-            
-            {filter !== 'all' || searchTerm ? (
-              <p className="text-gray-400 mb-6">
-                No missions match your current filters. Try changing the filter or search term.
-              </p>
-            ) : (
-              <p className="text-gray-400 mb-6">
-                You don't have any missions yet. Start a new mission to earn XP and badges!
-              </p>
-            )}
-            
-            <div className="flex justify-center">
-              <Button
-                onClick={() => {
-                  setFilter('all');
-                  setSearchTerm('');
-                }}
-                variant="secondary"
-                icon={Filter}
-                className="mr-2"
-              >
-                Clear Filters
-              </Button>
-              <Button
-                disabled
-                icon={Plus}
-              >
-                New Mission
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
-      
-      {/* Mission Detail Modal */}
-      {selectedMission && (
-        <MissionDetailModal
-          mission={selectedMission}
-          isOpen={!!selectedMission}
-          onClose={() => setSelectedMission(null)}
-          onStepComplete={handleStepComplete}
-        />
-      )}
-      
       {/* Mission Tips */}
       <Card className="p-4 bg-gradient-to-r from-blue-900/20 to-purple-900/20 border-blue-500/30">
         <div className="flex items-center space-x-3 mb-3">
