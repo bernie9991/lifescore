@@ -20,7 +20,11 @@ import {
   Check,
   Info,
   User as UserIcon,
-  Trophy
+  Trophy,
+  Clock,
+  EyeOff,
+  Eye,
+  HelpCircle
 } from 'lucide-react';
 import { User } from '../../types';
 import { formatNumber, formatCurrency, triggerConfetti } from '../../utils/animations';
@@ -72,17 +76,21 @@ interface StaticLeader {
   };
   isNPC: boolean;
   description: string;
+  specialtyIcon?: string;
+  specialtyTooltip?: string;
 }
 
 const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
   const [activeTab, setActiveTab] = useState('global');
-  const [filter, setFilter] = useState('combined');
+  const [timeframe, setTimeframe] = useState('all-time');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [friendRequests, setFriendRequests] = useState<Set<string>>(new Set());
   const [friends, setFriends] = useState<Set<string>>(new Set(user.friends || []));
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showNPCs, setShowNPCs] = useState(true);
+  const [tooltipVisible, setTooltipVisible] = useState<string | null>(null);
 
   const tabs = [
     { id: 'global', label: 'Global', icon: Globe, color: 'from-blue-500 to-cyan-400' },
@@ -92,10 +100,10 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
     { id: 'friends', label: 'Friends', icon: Users, color: 'from-rose-500 to-pink-400' },
   ];
 
-  const filters = [
-    { id: 'combined', label: 'Combined' },
-    { id: 'weekly', label: 'Weekly' },
+  const timeframeOptions = [
+    { id: 'all-time', label: 'All Time' },
     { id: 'monthly', label: 'Monthly' },
+    { id: 'weekly', label: 'Weekly' },
   ];
 
   // Static "NPC" leaders - famous and inspirational figures
@@ -111,7 +119,9 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
       knowledge: { total: 9500 },
       badge: { icon: '🚀', name: 'Space Pioneer', rarity: 'legendary' },
       isNPC: true,
-      description: 'Entrepreneur, CEO of Tesla and SpaceX'
+      description: 'Entrepreneur, CEO of Tesla and SpaceX',
+      specialtyIcon: '💰',
+      specialtyTooltip: 'Category Leader: Wealth'
     },
     {
       id: 'bill-gates',
@@ -124,7 +134,9 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
       knowledge: { total: 9200 },
       badge: { icon: '🖥️', name: 'Tech Visionary', rarity: 'legendary' },
       isNPC: true,
-      description: 'Co-founder of Microsoft, philanthropist'
+      description: 'Co-founder of Microsoft, philanthropist',
+      specialtyIcon: '🧠',
+      specialtyTooltip: 'Category Leader: Innovation'
     },
     {
       id: 'malala-yousafzai',
@@ -137,7 +149,9 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
       knowledge: { total: 9800 },
       badge: { icon: '🕊️', name: 'Peace Champion', rarity: 'legendary' },
       isNPC: true,
-      description: 'Nobel Prize laureate, education activist'
+      description: 'Nobel Prize laureate, education activist',
+      specialtyIcon: '🎓',
+      specialtyTooltip: 'Category Leader: Education'
     },
     {
       id: 'marie-curie',
@@ -150,7 +164,9 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
       knowledge: { total: 10000 },
       badge: { icon: '⚛️', name: 'Scientific Legend', rarity: 'legendary' },
       isNPC: true,
-      description: 'Physicist, chemist, pioneer in radioactivity'
+      description: 'Physicist, chemist, pioneer in radioactivity',
+      specialtyIcon: '🔬',
+      specialtyTooltip: 'Category Leader: Science'
     },
     {
       id: 'nelson-mandela',
@@ -163,7 +179,9 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
       knowledge: { total: 9600 },
       badge: { icon: '✊', name: 'Freedom Fighter', rarity: 'legendary' },
       isNPC: true,
-      description: 'Revolutionary, politician, philanthropist'
+      description: 'Revolutionary, politician, philanthropist',
+      specialtyIcon: '🌍',
+      specialtyTooltip: 'Category Leader: Social Impact'
     }
   ];
 
@@ -178,7 +196,7 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
 
       // Only include static leaders in the global leaderboard
       let staticLeadersToInclude: StaticLeader[] = [];
-      if (activeTab === 'global') {
+      if (activeTab === 'global' && showNPCs) {
         staticLeadersToInclude = staticLeaders;
       }
 
@@ -203,7 +221,9 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
           friends: [],
           createdAt: new Date('2020-01-01'),
           lastActive: new Date(),
-          role: 'user'
+          role: 'user',
+          specialtyIcon: leader.specialtyIcon,
+          specialtyTooltip: leader.specialtyTooltip
         },
         score: leader.lifeScore,
         change: Math.floor(Math.random() * 10),
@@ -309,6 +329,54 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
         rank: index + 1
       }));
 
+      // Find user's position
+      const userPosition = combinedEntries.findIndex(entry => entry.user.id === user.id);
+      
+      // If user is not in top entries but exists in the data, add them at the end with a separator
+      if (userPosition === -1 && realEntries.length > 0) {
+        // Create a mock entry for the current user with an estimated rank
+        const userScore = activeTab === 'wealth' 
+          ? (user.wealth?.total || 0) 
+          : activeTab === 'knowledge' 
+            ? (user.knowledge?.total || 0) 
+            : (user.lifeScore || 0);
+        
+        // Estimate rank based on score comparison with the last entry
+        const lastEntry = combinedEntries[combinedEntries.length - 1];
+        let estimatedRank = lastEntry.rank + 1;
+        
+        if (userScore > lastEntry.score) {
+          // If user score is higher than the last visible entry, estimate more accurately
+          for (let i = combinedEntries.length - 1; i >= 0; i--) {
+            if (userScore <= combinedEntries[i].score) {
+              estimatedRank = combinedEntries[i].rank + 1;
+              break;
+            }
+          }
+        } else {
+          // If user score is lower, just add a buffer
+          estimatedRank = lastEntry.rank + Math.floor(Math.random() * 10) + 5;
+        }
+        
+        // Add a separator entry
+        combinedEntries.push({
+          rank: -1, // Special rank for separator
+          user: {} as User,
+          score: 0,
+          change: 0,
+          isNPC: false
+        });
+        
+        // Add the user entry
+        combinedEntries.push({
+          rank: estimatedRank,
+          user: user,
+          score: userScore,
+          change: Math.floor(Math.random() * 10) - 5,
+          isNPC: false
+        });
+      }
+
       setLeaderboardData(combinedEntries);
     } catch (error) {
       console.error('Error loading leaderboard data:', error);
@@ -317,12 +385,12 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeTab, user]);
+  }, [activeTab, user, showNPCs]);
 
   // Initial load and tab change
   useEffect(() => {
     loadLeaderboardData();
-  }, [loadLeaderboardData, activeTab]);
+  }, [loadLeaderboardData, activeTab, showNPCs]);
 
   const currentTab = tabs.find(tab => tab.id === activeTab);
 
@@ -410,6 +478,8 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
 
   // Get card styling based on rank
   const getCardStyling = (rank: number, isCurrentUser: boolean, isNPC: boolean = false) => {
+    if (rank === -1) return 'border-none bg-transparent'; // Separator row
+    
     if (isCurrentUser) {
       return `bg-gradient-to-r ${currentTab?.color} bg-opacity-20 border-2 border-opacity-50 shadow-lg`;
     }
@@ -435,6 +505,8 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
 
   // Get avatar styling based on rank
   const getAvatarStyling = (rank: number, isNPC: boolean = false) => {
+    if (rank === -1) return ''; // Separator row
+    
     if (isNPC) {
       return 'bg-gradient-to-r from-purple-400 to-indigo-400 shadow-lg shadow-purple-400/30';
     }
@@ -477,6 +549,10 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
     loadLeaderboardData(true);
   };
 
+  const handleTooltipToggle = (id: string | null) => {
+    setTooltipVisible(id);
+  };
+
   if (loading && leaderboardData.length === 0) {
     return (
       <div className="space-y-6">
@@ -509,6 +585,50 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
           <p className="text-gray-300 mt-2 text-sm md:text-base">Compete and climb the rankings!</p>
         </div>
         <div className="flex items-center space-x-2">
+          {/* Timeframe Selector */}
+          <div className="bg-gray-800 rounded-lg p-1 hidden md:flex">
+            {timeframeOptions.map((option) => (
+              <button
+                key={option.id}
+                onClick={() => setTimeframe(option.id)}
+                className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                  timeframe === option.id
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          
+          {/* Mobile Timeframe Selector */}
+          <div className="md:hidden">
+            <select
+              value={timeframe}
+              onChange={(e) => setTimeframe(e.target.value)}
+              className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-sm text-white"
+            >
+              {timeframeOptions.map((option) => (
+                <option key={option.id} value={option.id}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+          
+          {/* NPC Toggle */}
+          {activeTab === 'global' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowNPCs(!showNPCs)}
+              className={`text-sm ${showNPCs ? 'text-purple-400' : 'text-gray-400'}`}
+              icon={showNPCs ? Eye : EyeOff}
+            >
+              <span className="hidden md:inline">{showNPCs ? 'Hide' : 'Show'} NPCs</span>
+              <span className="md:hidden">NPCs</span>
+            </Button>
+          )}
+          
           <Button 
             variant="ghost" 
             size="sm" 
@@ -517,16 +637,7 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
             className="text-gray-400 hover:text-white"
             icon={refreshing ? Loader2 : RefreshCw}
           >
-            {refreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
-          <Button 
-            variant="secondary" 
-            icon={Filter} 
-            size="sm" 
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-sm"
-          >
-            <span className="hidden sm:inline">Filters</span>
-            <span className="sm:hidden">Filter</span>
+            <span className="hidden md:inline">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
           </Button>
         </div>
       </div>
@@ -551,82 +662,8 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Mobile-Optimized Filter Buttons */}
-      <div className="flex space-x-2 overflow-x-auto">
-        {filters.map((filterOption) => (
-          <button
-            key={filterOption.id}
-            onClick={() => setFilter(filterOption.id)}
-            className={`px-3 md:px-4 py-2 rounded-lg text-sm transition-all font-medium whitespace-nowrap ${
-              filter === filterOption.id
-                ? `bg-gradient-to-r ${currentTab?.color} text-white shadow-md`
-                : 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 hover:text-white'
-            }`}
-          >
-            {filterOption.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Current User Position */}
-      {user && (
-        <Card className={`p-4 md:p-6 border-2 bg-gradient-to-r ${currentTab?.color} bg-opacity-10 border-opacity-50`} style={{ borderColor: 'rgb(59 130 246 / 0.5)' }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <div className={`w-16 h-16 bg-gradient-to-r ${currentTab?.color} rounded-full flex items-center justify-center shadow-lg cursor-pointer`}
-                     onClick={() => handleUserClick(user)}>
-                  {user.avatar ? (
-                    <img
-                      src={user.avatar}
-                      alt={user.name}
-                      className="w-16 h-16 rounded-full object-cover border-2 border-white"
-                    />
-                  ) : (
-                    <UserIcon className="w-8 h-8 text-white" />
-                  )}
-                </div>
-                
-                {/* Avatar Badge */}
-                {user.avatarBadge && (
-                  <div className="absolute -top-1 -right-1 w-6 h-6 bg-gray-800 rounded-full flex items-center justify-center border-2 border-gray-700">
-                    <span className="text-xs">{user.avatarBadge.icon}</span>
-                  </div>
-                )}
-                
-                <div className="absolute -top-1 -right-1 bg-yellow-400 rounded-full p-1">
-                  <Star className="w-4 h-4 text-yellow-900" />
-                </div>
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-white cursor-pointer hover:text-blue-300 transition-colors"
-                    onClick={() => handleUserClick(user)}>
-                  {user.name} (You)
-                </h3>
-                <p className="text-gray-300">{user.city}, {user.country}</p>
-                <div className="flex items-center space-x-2 mt-1">
-                  <Zap className="w-4 h-4 text-yellow-400" />
-                  <span className="text-yellow-400 font-semibold">
-                    {formatNumber(user.lifeScore)} XP
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className={`text-3xl font-bold bg-gradient-to-r ${currentTab?.color} bg-clip-text text-transparent`}>
-                #{formatNumber(leaderboardData.findIndex(entry => entry.user.id === user.id) + 1 || 1)}
-              </div>
-              <div className="text-green-400 font-semibold flex items-center justify-end">
-                <TrendingUp className="w-4 h-4 mr-1" />
-                ↑ 7 today
-              </div>
-            </div>
-          </div>
-        </Card>
-      )}
-
       {/* NPC Indicator - Only show for global leaderboard */}
-      {activeTab === 'global' && (
+      {activeTab === 'global' && showNPCs && (
         <div className="flex items-center justify-center space-x-2 bg-indigo-900/20 border border-indigo-500/30 rounded-lg p-3 text-indigo-300 text-sm">
           <Info className="w-4 h-4" />
           <span>Entries marked with <span className="bg-purple-500/20 px-2 py-0.5 rounded-full text-purple-300 text-xs font-semibold">NPC</span> are platform-generated inspirational figures</span>
@@ -637,110 +674,145 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
       {leaderboardData.length > 0 ? (
         <Card className="p-3 md:p-6 bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm">
           <div className="space-y-2 md:space-y-3">
-            {leaderboardData.map((entry, index) => (
-              <motion.div
-                key={`${entry.user.id}-${activeTab}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className={`transition-all hover:scale-[1.02] rounded-xl p-4 ${
-                  getCardStyling(entry.rank, entry.user.id === user.id, entry.isNPC)
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4 flex-1">
-                    <div className="w-12 flex justify-center items-center">
-                      {getRankIcon(entry.rank)}
-                    </div>
-                    
-                    <div className="relative">
-                      <div className={`w-14 h-14 rounded-full flex items-center justify-center cursor-pointer ${getAvatarStyling(entry.rank, entry.isNPC)}`}
-                           onClick={() => handleUserClick(entry.user)}>
-                        {entry.user.avatar ? (
-                          <img
-                            src={entry.user.avatar}
-                            alt={entry.user.name}
-                            className="w-14 h-14 rounded-full object-cover border-2 border-white"
-                          />
-                        ) : (
-                          <UserIcon className="w-7 h-7 text-white" />
+            {leaderboardData.map((entry, index) => {
+              // Skip rendering if it's an NPC and showNPCs is false
+              if (entry.isNPC && !showNPCs) return null;
+              
+              // Special case for separator row
+              if (entry.rank === -1) {
+                return (
+                  <div key="separator" className="flex items-center justify-center py-2">
+                    <div className="w-full border-t border-dashed border-gray-600"></div>
+                    <div className="px-4 text-gray-400 text-sm">...</div>
+                    <div className="w-full border-t border-dashed border-gray-600"></div>
+                  </div>
+                );
+              }
+              
+              return (
+                <motion.div
+                  key={`${entry.user.id}-${activeTab}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className={`transition-all hover:scale-[1.02] rounded-xl p-4 ${
+                    getCardStyling(entry.rank, entry.user.id === user.id, entry.isNPC)
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4 flex-1">
+                      <div className="w-12 flex justify-center items-center">
+                        {getRankIcon(entry.rank)}
+                      </div>
+                      
+                      <div className="relative">
+                        <div className={`w-14 h-14 rounded-full flex items-center justify-center cursor-pointer ${getAvatarStyling(entry.rank, entry.isNPC)}`}
+                             onClick={() => handleUserClick(entry.user)}>
+                          {entry.user.avatar ? (
+                            <img
+                              src={entry.user.avatar}
+                              alt={entry.user.name}
+                              className="w-14 h-14 rounded-full object-cover border-2 border-white"
+                            />
+                          ) : (
+                            <UserIcon className="w-7 h-7 text-white" />
+                          )}
+                        </div>
+                        
+                        {entry.rank <= 3 && (
+                          <div className="absolute -top-1 -right-1 bg-yellow-400 rounded-full p-1 shadow-lg">
+                            <Star className="w-3 h-3 text-yellow-900" />
+                          </div>
+                        )}
+                        
+                        {/* Specialty Icon with Tooltip for NPCs */}
+                        {entry.isNPC && entry.user.specialtyIcon && (
+                          <div 
+                            className="absolute -bottom-1 -right-1 bg-purple-500 rounded-full p-1 shadow-lg cursor-help"
+                            onMouseEnter={() => handleTooltipToggle(entry.user.id)}
+                            onMouseLeave={() => handleTooltipToggle(null)}
+                          >
+                            <span className="text-xs">{entry.user.specialtyIcon}</span>
+                            
+                            {/* Tooltip */}
+                            {tooltipVisible === entry.user.id && (
+                              <div className="absolute bottom-full right-0 mb-2 w-48 bg-gray-800 text-white text-xs rounded-lg p-2 shadow-lg z-10">
+                                {entry.user.specialtyTooltip}
+                                <div className="absolute bottom-0 right-2 transform translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800"></div>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                       
-                      {entry.rank <= 3 && (
-                        <div className="absolute -top-1 -right-1 bg-yellow-400 rounded-full p-1 shadow-lg">
-                          <Star className="w-3 h-3 text-yellow-900" />
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex-1">
-                      <div className="flex items-center">
-                        <h3 className="font-bold text-white text-lg cursor-pointer hover:text-blue-300 transition-colors"
-                            onClick={() => handleUserClick(entry.user)}>
-                          {entry.user.name}
-                          {entry.user.id === user.id && (
-                            <span className={`ml-2 text-sm bg-gradient-to-r ${currentTab?.color} bg-clip-text text-transparent font-semibold`}>
-                              (You)
+                      <div className="flex-1">
+                        <div className="flex items-center">
+                          <h3 className="font-bold text-white text-lg cursor-pointer hover:text-blue-300 transition-colors"
+                              onClick={() => handleUserClick(entry.user)}>
+                            {entry.user.name}
+                            {entry.user.id === user.id && (
+                              <span className={`ml-2 text-sm bg-gradient-to-r ${currentTab?.color} bg-clip-text text-transparent font-semibold`}>
+                                (You)
+                              </span>
+                            )}
+                          </h3>
+                          
+                          {/* NPC Badge */}
+                          {entry.isNPC && (
+                            <span className="ml-2 bg-purple-500/20 px-2 py-0.5 rounded-full text-purple-300 text-xs font-semibold">
+                              NPC
                             </span>
                           )}
-                        </h3>
+                        </div>
+                        <p className="text-gray-400">{entry.user.country}</p>
                         
-                        {/* NPC Badge */}
+                        {/* Description for NPCs */}
                         {entry.isNPC && (
-                          <span className="ml-2 bg-purple-500/20 px-2 py-0.5 rounded-full text-purple-300 text-xs font-semibold">
-                            NPC
-                          </span>
+                          <p className="text-gray-400 text-sm italic">
+                            {(entry.user as any).description || "Inspirational figure"}
+                          </p>
                         )}
                       </div>
-                      <p className="text-gray-400">{entry.user.country}</p>
-                      
-                      {/* Description for NPCs */}
-                      {entry.isNPC && (
-                        <p className="text-gray-400 text-sm italic">
-                          {(entry.user as any).description || "Inspirational figure"}
-                        </p>
+                    </div>
+                    
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-white mb-1">
+                          {getScoreDisplay(entry)}
+                        </div>
+                        <div className={`text-sm font-semibold flex items-center justify-end ${
+                          entry.change > 0 ? 'text-green-400' : entry.change < 0 ? 'text-red-400' : 'text-gray-400'
+                        }`}>
+                          {entry.change > 0 ? (
+                            <TrendingUp className="w-4 h-4 mr-1" />
+                          ) : entry.change < 0 ? (
+                            <TrendingUp className="w-4 h-4 mr-1 rotate-180" />
+                          ) : null}
+                          {getChangeDisplay(entry)} today
+                        </div>
+                      </div>
+
+                      {/* Add Friend Button - Only for real users, not NPCs */}
+                      {entry.user.id !== user.id && !entry.isNPC && (
+                        <Button
+                          variant={getFriendButtonVariant(entry.user.id)}
+                          size="sm"
+                          icon={UserPlus}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddFriend(entry.user.id);
+                          }}
+                          disabled={isFriend(entry.user.id) || hasPendingRequest(entry.user.id)}
+                          className={getFriendButtonClass(entry.user.id)}
+                        >
+                          {getFriendButtonText(entry.user.id)}
+                        </Button>
                       )}
                     </div>
                   </div>
-                  
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-white mb-1">
-                        {getScoreDisplay(entry)}
-                      </div>
-                      <div className={`text-sm font-semibold flex items-center justify-end ${
-                        entry.change > 0 ? 'text-green-400' : entry.change < 0 ? 'text-red-400' : 'text-gray-400'
-                      }`}>
-                        {entry.change > 0 ? (
-                          <TrendingUp className="w-4 h-4 mr-1" />
-                        ) : entry.change < 0 ? (
-                          <TrendingUp className="w-4 h-4 mr-1 rotate-180" />
-                        ) : null}
-                        {getChangeDisplay(entry)} today
-                      </div>
-                    </div>
-
-                    {/* Add Friend Button - Only for real users, not NPCs */}
-                    {entry.user.id !== user.id && !entry.isNPC && (
-                      <Button
-                        variant={getFriendButtonVariant(entry.user.id)}
-                        size="sm"
-                        icon={UserPlus}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddFriend(entry.user.id);
-                        }}
-                        disabled={isFriend(entry.user.id) || hasPendingRequest(entry.user.id)}
-                        className={getFriendButtonClass(entry.user.id)}
-                      >
-                        {getFriendButtonText(entry.user.id)}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </div>
         </Card>
       ) : (
@@ -784,12 +856,15 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
             {activeTab === 'friends' && '👥 Friend Circle'}
           </h3>
           <p className="text-gray-300 text-sm md:text-base">
-            {activeTab === 'global' && 'Compete against users worldwide and inspirational figures'}
+            {activeTab === 'global' && `Compete against users worldwide${showNPCs ? ' and inspirational figures' : ''}`}
             {activeTab === 'local' && `See how you rank in ${user.city} and ${user.country}`}
             {activeTab === 'wealth' && 'Rankings based on total net worth'}
             {activeTab === 'knowledge' && 'Education, certificates, and skills combined'}
             {activeTab === 'friends' && 'Private leaderboard with your connections'}
           </p>
+          <div className="text-sm text-gray-400 mt-2">
+            Showing {timeframe === 'all-time' ? 'all-time' : timeframe} rankings
+          </div>
         </div>
       </Card>
 
