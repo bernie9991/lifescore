@@ -19,12 +19,24 @@ import {
   ChevronDown,
   ChevronUp,
   Send,
-  EyeOff
+  EyeOff,
+  ThumbsUp
 } from 'lucide-react';
 import { formatNumber, formatCurrency } from '../../utils/animations';
 import { formatRelativeTime } from '../../utils/feedUtils';
 import Button from '../common/Button';
 import Card from '../common/Card';
+
+interface Comment {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  content: string;
+  timestamp: Date;
+  likes: number;
+  likedBy?: string[];
+}
 
 interface AutomatedFeedPostProps {
   id: string;
@@ -41,7 +53,7 @@ interface AutomatedFeedPostProps {
   badge?: { icon: string; name: string; rarity: string };
   xpEarned?: number;
   reactions: Record<string, string[]>;
-  comments: any[];
+  comments: Comment[];
   onUserClick: () => void;
   onReaction: (type: string) => void;
   onComment: (content: string) => void;
@@ -52,6 +64,9 @@ interface AutomatedFeedPostProps {
   canSeed?: boolean;
   seedCount?: number;
   isSeeded?: boolean;
+  showComments: boolean;
+  onToggleComments: () => void;
+  onLikeComment?: (commentId: string) => void;
 }
 
 const AutomatedFeedPost: React.FC<AutomatedFeedPostProps> = ({
@@ -78,9 +93,11 @@ const AutomatedFeedPost: React.FC<AutomatedFeedPostProps> = ({
   isFriend = false,
   canSeed = false,
   seedCount = 0,
-  isSeeded = false
+  isSeeded = false,
+  showComments,
+  onToggleComments,
+  onLikeComment
 }) => {
-  const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState('');
 
   // Get icon based on update type
@@ -143,6 +160,11 @@ const AutomatedFeedPost: React.FC<AutomatedFeedPostProps> = ({
       onComment(newComment);
       setNewComment('');
     }
+  };
+
+  // Check if user has liked a comment
+  const hasUserLikedComment = (comment: Comment) => {
+    return comment.likedBy?.includes(currentUserId) || false;
   };
 
   return (
@@ -285,11 +307,16 @@ const AutomatedFeedPost: React.FC<AutomatedFeedPostProps> = ({
 
           {/* Comments Button */}
           <button
-            onClick={() => setShowComments(!showComments)}
+            onClick={onToggleComments}
             className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 transition-all"
           >
             <MessageCircle className="w-4 h-4" />
             <span>{comments.length}</span>
+            {showComments ? (
+              <ChevronUp className="w-3 h-3" />
+            ) : (
+              <ChevronDown className="w-3 h-3" />
+            )}
           </button>
           
           {/* Hide Post Button */}
@@ -316,15 +343,7 @@ const AutomatedFeedPost: React.FC<AutomatedFeedPostProps> = ({
           {/* Add Comment */}
           <div className="flex space-x-3 mb-4">
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-              {userAvatar ? (
-                <img
-                  src={userAvatar}
-                  alt={userName}
-                  className="w-8 h-8 rounded-full object-cover"
-                />
-              ) : (
-                <User className="w-4 h-4 text-white" />
-              )}
+              <User className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1 flex space-x-2">
               <input
@@ -366,8 +385,23 @@ const AutomatedFeedPost: React.FC<AutomatedFeedPostProps> = ({
                     <div className="font-semibold text-white text-sm">{comment.userName}</div>
                     <div className="text-gray-300 text-sm">{comment.content}</div>
                   </div>
-                  <div className="text-gray-400 text-xs mt-1 ml-3">
-                    {formatRelativeTime(comment.timestamp)}
+                  <div className="flex items-center mt-1 ml-3">
+                    <div className="text-gray-400 text-xs mr-3">
+                      {formatRelativeTime(comment.timestamp)}
+                    </div>
+                    {onLikeComment && (
+                      <button 
+                        onClick={() => onLikeComment(comment.id)}
+                        className={`flex items-center text-xs ${
+                          hasUserLikedComment(comment) 
+                            ? 'text-blue-400' 
+                            : 'text-gray-400 hover:text-blue-400'
+                        }`}
+                      >
+                        <ThumbsUp className="w-3 h-3 mr-1" />
+                        {comment.likes > 0 && <span>{comment.likes}</span>}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

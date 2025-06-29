@@ -30,7 +30,8 @@ import {
   RefreshCw, 
   Loader2,
   Filter,
-  EyeOff
+  EyeOff,
+  ThumbsUp
 } from 'lucide-react';
 import { User } from '../../types';
 import { formatNumber, triggerEmojiConfetti } from '../../utils/animations';
@@ -57,7 +58,8 @@ import {
   updateDoc,
   arrayUnion,
   arrayRemove,
-  deleteDoc
+  deleteDoc,
+  increment
 } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import AutomatedFeedPost from './AutomatedFeedPost';
@@ -67,6 +69,17 @@ import { feedCache } from './FeedCache';
 
 interface FeedProps {
   user: User;
+}
+
+interface Comment {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  content: string;
+  timestamp: Date;
+  likes: number;
+  likedBy?: string[];
 }
 
 interface FeedItem {
@@ -95,16 +108,6 @@ interface FeedItem {
   comments: Comment[];
   metadata?: any;
   isHidden?: boolean;
-}
-
-interface Comment {
-  id: string;
-  userId: string;
-  userName: string;
-  userAvatar?: string;
-  content: string;
-  timestamp: Date;
-  likes: number;
 }
 
 interface Challenge {
@@ -142,6 +145,7 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
   const [error, setError] = useState<string | null>(null);
   const [hiddenPosts, setHiddenPosts] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<string>('all');
+  const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
 
   // Refs for infinite scroll
   const feedContainerRef = useRef<HTMLDivElement>(null);
@@ -266,6 +270,13 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
         // Skip hidden posts
         if (hiddenPosts.has(doc.id)) return;
         
+        // Process comments to ensure they have proper timestamp objects
+        const processedComments = (data.comments || []).map((comment: any) => ({
+          ...comment,
+          timestamp: comment.timestamp?.toDate() || new Date(),
+          likedBy: comment.likedBy || []
+        }));
+        
         items.push({
           id: doc.id,
           userId: data.userId,
@@ -289,7 +300,7 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
           timestamp: data.timestamp?.toDate() || new Date(),
           reactions: data.reactions || {},
           visual: data.visual,
-          comments: data.comments || [],
+          comments: processedComments,
           metadata: data.metadata
         });
       });
@@ -343,6 +354,26 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
       localStorage.setItem(`hidden_posts_${user.id}`, JSON.stringify([...hiddenPosts]));
     }
   }, [hiddenPosts, user.id]);
+
+  // Load liked comments from localStorage
+  useEffect(() => {
+    const savedLikedComments = localStorage.getItem(`liked_comments_${user.id}`);
+    if (savedLikedComments) {
+      try {
+        const parsedLikedComments = JSON.parse(savedLikedComments);
+        setLikedComments(new Set(parsedLikedComments));
+      } catch (error) {
+        console.error('Error loading liked comments:', error);
+      }
+    }
+  }, [user.id]);
+
+  // Save liked comments to localStorage
+  useEffect(() => {
+    if (likedComments.size > 0) {
+      localStorage.setItem(`liked_comments_${user.id}`, JSON.stringify([...likedComments]));
+    }
+  }, [likedComments, user.id]);
 
   // Pull to refresh
   const handleRefresh = useCallback(() => {
@@ -562,38 +593,39 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
   }, []);
 
   // Handle add comment
-  const handleAddComment = useCallback(async (postId: string) => {
-    const commentText = newComments[postId]?.trim();
-    if (!commentText) return;
+  const handleAddComment = useCallback(async (postId: string, commentText: string) => {
+    if (!commentText.trim()) return;
 
     try {
       const newComment: Comment = {
-        id: `c${Date.now()}`,
+        id: `c${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         userId: user.id,
         userName: user.name,
         userAvatar: user.avatar,
-        content: commentText,
+        content: commentText.trim(),
         timestamp: new Date(),
-        likes: 0
+        likes: 0,
+        likedBy: []
       };
 
       // Update Firestore
       const postRef = doc(db, 'feedItems', postId);
       await updateDoc(postRef, {
-        comments: arrayUnion(newComment)
+        comments: arrayUnion({
+          ...newComment,
+          timestamp: serverTimestamp() // Use server timestamp for Firestore
+        })
       });
 
       // Update local state
       setFeedItems(prev => prev.map(item => {
         if (item.id === postId) {
-          return { ...item, comments: [...item.comments, newComment] };
+          return { 
+            ...item, 
+            comments: [...item.comments, newComment]
+          };
         }
         return item;
-      }));
-
-      setNewComments(prev => ({
-        ...prev,
-        [postId]: ''
       }));
 
       toast.success('Comment added! 💬');
@@ -601,7 +633,72 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
       console.error('Error adding comment:', error);
       toast.error('Failed to add comment');
     }
-  }, [newComments, user]);
+  }, [user]);
+
+  // Handle like comment
+  const handleLikeComment = useCallback(async (postId: string, commentId: string) => {
+    try {
+      const post = feedItems.find(item => item.id === postId);
+      if (!post) return;
+
+      const comment = post.comments.find(c => c.id === commentId);
+      if (!comment) return;
+
+      const isLiked = likedComments.has(commentId);
+      const postRef = doc(db, 'feedItems', postId);
+      
+      // Create a new array of comments with the updated one
+      const updatedComments = post.comments.map(c => {
+        if (c.id === commentId) {
+          // If already liked, remove like
+          if (isLiked) {
+            return {
+              ...c,
+              likes: Math.max(0, c.likes - 1),
+              likedBy: (c.likedBy || []).filter(id => id !== user.id)
+            };
+          } 
+          // Otherwise add like
+          else {
+            return {
+              ...c,
+              likes: (c.likes || 0) + 1,
+              likedBy: [...(c.likedBy || []), user.id]
+            };
+          }
+        }
+        return c;
+      });
+
+      // Update Firestore
+      await updateDoc(postRef, {
+        comments: updatedComments
+      });
+
+      // Update local state for liked comments
+      if (isLiked) {
+        setLikedComments(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(commentId);
+          return newSet;
+        });
+      } else {
+        setLikedComments(prev => new Set([...prev, commentId]));
+      }
+
+      // Update local state for feed items
+      setFeedItems(prev => prev.map(item => {
+        if (item.id === postId) {
+          return { ...item, comments: updatedComments };
+        }
+        return item;
+      }));
+
+    } catch (error) {
+      console.error('Error liking comment:', error);
+      toast.error('Failed to like comment');
+    }
+  }, [feedItems, likedComments, user.id]);
 
   // Handle hide post
   const handleHidePost = useCallback((postId: string) => {
@@ -801,10 +898,7 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
                     comments={item.comments}
                     onUserClick={() => handleUserClick(item)}
                     onReaction={(type) => handleReaction(item.id, type)}
-                    onComment={(content) => {
-                      setNewComments({ ...newComments, [item.id]: content });
-                      handleAddComment(item.id);
-                    }}
+                    onComment={(content) => handleAddComment(item.id, content)}
                     onSeed={shouldShowSeedButton(item) ? () => handleSeed(item.id) : undefined}
                     onHidePost={() => handleHidePost(item.id)}
                     currentUserId={user.id}
@@ -814,6 +908,7 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
                     isSeeded={item.seededBy.includes(user.id)}
                     showComments={expandedComments.has(item.id)}
                     onToggleComments={() => handleToggleComments(item.id)}
+                    onLikeComment={(commentId) => handleLikeComment(item.id, commentId)}
                   />
                 </motion.div>
               ))}
