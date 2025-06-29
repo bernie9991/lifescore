@@ -122,6 +122,7 @@ function App() {
     <Router>
       <AppContent />
     </Router>
+      initializeRevenueCat(); // Call the initialization function
   );
 }
 
