@@ -132,13 +132,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
           </motion.div>
         )}
 
-        {/* Demo Admin Notice */}
-        <div className="mb-6 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-          <p className="text-blue-300 text-sm text-center">
-            <strong>Demo Admin:</strong> admin / admin123
-          </p>
-        </div>
-
         {/* Form */}
         {isLogin ? (
           <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-6">
