@@ -7,11 +7,13 @@ import Feed from '../feed/Feed';
 import QuestsAndMissions from '../quests/QuestsAndMissions';
 import Leaderboards from '../leaderboards/Leaderboards';
 import Badges from '../badges/Badges';
+import Friends from '../friends/Friends';
 import Profile from '../profile/Profile';
 
 const MainAppLayout: React.FC = () => {
   const { user } = useAuth();
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  // FIXED: Changed default page from 'dashboard' to 'feed'
+  const [currentPage, setCurrentPage] = useState('feed');
 
   if (!user) {
     return (
@@ -43,16 +45,12 @@ const MainAppLayout: React.FC = () => {
         return <Leaderboards user={user} />;
       case 'badges':
         return <Badges user={user} />;
+      case 'friends':
+        return <Friends user={user} />;
       case 'profile':
         return <Profile user={user} />;
       default:
-        return (
-          <Dashboard 
-            user={user} 
-            onProfileClick={() => setCurrentPage('profile')}
-            onSettingsClick={() => setCurrentPage('profile')}
-          />
-        );
+        return <Feed user={user} />;
     }
   };
 
