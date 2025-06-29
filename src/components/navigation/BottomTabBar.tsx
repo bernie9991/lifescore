@@ -7,7 +7,8 @@ import {
   User, 
   Activity,
   BarChart3,
-  Target
+  Target,
+  MessageSquare
 } from 'lucide-react';
 
 interface BottomTabBarProps {

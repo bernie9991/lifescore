@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   User, 
@@ -20,7 +20,13 @@ import {
   Users,
   Puzzle,
   Lock,
-  ExternalLink
+  ExternalLink,
+  MessageSquare,
+  EyeOff,
+  Eye,
+  Filter,
+  Clock,
+  Loader2
 } from 'lucide-react';
 import { User as UserType } from '../../types';
 import { formatCurrency, formatNumber, triggerAchievementConfetti } from '../../utils/animations';
@@ -32,6 +38,7 @@ import UpdateWealthModal from '../modals/UpdateWealthModal';
 import AddCertificateModal from '../modals/AddCertificateModal';
 import IntegrationsModal from '../modals/IntegrationsModal';
 import Friends from '../friends/Friends';
+import MyPosts from './MyPosts';
 import toast from 'react-hot-toast';
 
 interface ProfileProps {
@@ -186,7 +193,8 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
-    { id: 'friends', label: 'Friends', icon: Users }
+    { id: 'friends', label: 'Friends', icon: Users },
+    { id: 'my-posts', label: 'My Posts', icon: MessageSquare }
   ];
 
   // Integration apps data
@@ -859,6 +867,11 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
       {/* Friends Tab */}
       {activeTab === 'friends' && (
         <Friends user={user} />
+      )}
+
+      {/* My Posts Tab */}
+      {activeTab === 'my-posts' && (
+        <MyPosts user={user} />
       )}
     </div>
   );
