@@ -1,14 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Globe, MapPin, Building, Users, Filter, Crown, Medal, Award, DollarSign, GraduationCap, TrendingUp, Star, Zap, UserPlus } from 'lucide-react';
+import { 
+  Globe, 
+  MapPin, 
+  Building, 
+  Users, 
+  Filter, 
+  Crown, 
+  Medal, 
+  Award, 
+  DollarSign, 
+  GraduationCap, 
+  TrendingUp, 
+  Star, 
+  Zap, 
+  UserPlus,
+  Loader2,
+  RefreshCw,
+  Check,
+  Info,
+  User as UserIcon,
+  Trophy
+} from 'lucide-react';
 import { User } from '../../types';
 import { formatNumber, formatCurrency, triggerConfetti } from '../../utils/animations';
 import { calculateLifeScore, estimateGlobalStanding } from '../../utils/lifeScoreEngine';
-import { getMockLeaderboard } from '../../utils/mockData';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import UserProfileModal from '../modals/UserProfileModal';
 import toast from 'react-hot-toast';
+import { db } from '../../lib/firebase';
+import { 
+  collection, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  getDocs 
+} from 'firebase/firestore';
 
 interface LeaderboardsProps {
   user: User;
@@ -20,6 +49,29 @@ interface LeaderboardEntry {
   score: number;
   change: number;
   badge?: any;
+  isNPC?: boolean;
+}
+
+interface StaticLeader {
+  id: string;
+  name: string;
+  avatar?: string;
+  country: string;
+  city: string;
+  lifeScore: number;
+  wealth?: {
+    total: number;
+  };
+  knowledge?: {
+    total: number;
+  };
+  badge?: {
+    icon: string;
+    name: string;
+    rarity: string;
+  };
+  isNPC: boolean;
+  description: string;
 }
 
 const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
@@ -30,6 +82,7 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
   const [friends, setFriends] = useState<Set<string>>(new Set(user.friends || []));
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const tabs = [
     { id: 'global', label: 'Global', icon: Globe, color: 'from-blue-500 to-cyan-400' },
@@ -45,30 +98,239 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
     { id: 'monthly', label: 'Monthly' },
   ];
 
-  // Load leaderboard data using mock data
-  useEffect(() => {
-    loadLeaderboardData();
-  }, [activeTab, filter]);
+  // Static "NPC" leaders - famous and inspirational figures
+  const staticLeaders: StaticLeader[] = [
+    {
+      id: 'elon-musk',
+      name: 'Elon Musk',
+      avatar: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Elon_Musk_Royal_Society_%28crop2%29.jpg/330px-Elon_Musk_Royal_Society_%28crop2%29.jpg',
+      country: 'United States',
+      city: 'Austin',
+      lifeScore: 28500,
+      wealth: { total: 180000000000 },
+      knowledge: { total: 9500 },
+      badge: { icon: '🚀', name: 'Space Pioneer', rarity: 'legendary' },
+      isNPC: true,
+      description: 'Entrepreneur, CEO of Tesla and SpaceX'
+    },
+    {
+      id: 'bill-gates',
+      name: 'Bill Gates',
+      avatar: 'https://upload.wikimedia.org/wikipedia/commons/a/a8/Bill_Gates_2017_%28cropped%29.jpg',
+      country: 'United States',
+      city: 'Seattle',
+      lifeScore: 27800,
+      wealth: { total: 120000000000 },
+      knowledge: { total: 9200 },
+      badge: { icon: '🖥️', name: 'Tech Visionary', rarity: 'legendary' },
+      isNPC: true,
+      description: 'Co-founder of Microsoft, philanthropist'
+    },
+    {
+      id: 'malala-yousafzai',
+      name: 'Malala Yousafzai',
+      avatar: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Malala_Yousafzai_at_Girl_Summit_2014.jpg/330px-Malala_Yousafzai_at_Girl_Summit_2014.jpg',
+      country: 'United Kingdom',
+      city: 'Birmingham',
+      lifeScore: 24600,
+      wealth: { total: 2000000 },
+      knowledge: { total: 9800 },
+      badge: { icon: '🕊️', name: 'Peace Champion', rarity: 'legendary' },
+      isNPC: true,
+      description: 'Nobel Prize laureate, education activist'
+    },
+    {
+      id: 'marie-curie',
+      name: 'Marie Curie',
+      avatar: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Marie_Curie_c1920.jpg/330px-Marie_Curie_c1920.jpg',
+      country: 'France',
+      city: 'Paris',
+      lifeScore: 26500,
+      wealth: { total: 1000000 },
+      knowledge: { total: 10000 },
+      badge: { icon: '⚛️', name: 'Scientific Legend', rarity: 'legendary' },
+      isNPC: true,
+      description: 'Physicist, chemist, pioneer in radioactivity'
+    },
+    {
+      id: 'nelson-mandela',
+      name: 'Nelson Mandela',
+      avatar: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Nelson_Mandela_1994.jpg/330px-Nelson_Mandela_1994.jpg',
+      country: 'South Africa',
+      city: 'Johannesburg',
+      lifeScore: 25800,
+      wealth: { total: 10000000 },
+      knowledge: { total: 9600 },
+      badge: { icon: '✊', name: 'Freedom Fighter', rarity: 'legendary' },
+      isNPC: true,
+      description: 'Revolutionary, politician, philanthropist'
+    }
+  ];
 
-  const loadLeaderboardData = async () => {
+  // Load leaderboard data from Firestore
+  const loadLeaderboardData = useCallback(async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      // Only include static leaders in the global leaderboard
+      let staticLeadersToInclude: StaticLeader[] = [];
+      if (activeTab === 'global') {
+        staticLeadersToInclude = staticLeaders;
+      }
+
+      // Convert static leaders to LeaderboardEntry format
+      const staticEntries: LeaderboardEntry[] = staticLeadersToInclude.map((leader, index) => ({
+        rank: index + 1, // Temporary rank, will be recalculated after merging
+        user: {
+          id: leader.id,
+          uid: leader.id,
+          name: leader.name,
+          email: `${leader.name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+          avatar: leader.avatar,
+          country: leader.country,
+          city: leader.city,
+          lifeScore: leader.lifeScore,
+          username: leader.name.toLowerCase().replace(/\s+/g, ''),
+          isRealNameVisible: true,
+          wealth: leader.wealth || { salary: 0, savings: 0, investments: 0, currency: 'USD', total: 0 },
+          knowledge: leader.knowledge || { education: '', certificates: [], languages: [], total: 0 },
+          assets: [],
+          badges: leader.badge ? [{ ...leader.badge, id: 'special-badge', xpReward: 5000 }] : [],
+          friends: [],
+          createdAt: new Date('2020-01-01'),
+          lastActive: new Date(),
+          role: 'user'
+        },
+        score: leader.lifeScore,
+        change: Math.floor(Math.random() * 10),
+        badge: leader.badge,
+        isNPC: true
+      }));
+
+      // Fetch real users from Firestore
+      let realEntries: LeaderboardEntry[] = [];
       
-      // Use mock data instead of Supabase
-      const mockData = getMockLeaderboard(activeTab, user);
-      setLeaderboardData(mockData);
+      // Different queries based on tab
+      let usersQuery;
       
+      if (activeTab === 'friends') {
+        // Get user's friends
+        const friendIds = [...(user.friends || []), user.id]; // Include current user
+        
+        if (friendIds.length <= 1) { // Only the current user
+          setLeaderboardData([]);
+          setLoading(false);
+          setRefreshing(false);
+          return;
+        }
+        
+        // Firestore 'in' operator is limited to 10 values
+        // For simplicity, we'll just take the first 10 friends
+        const friendsToQuery = friendIds.slice(0, 10);
+        
+        usersQuery = query(
+          collection(db, 'users'),
+          where('id', 'in', friendsToQuery),
+          orderBy('lifeScore', 'desc'),
+          limit(50)
+        );
+      } else if (activeTab === 'local' && user.country) {
+        // Local leaderboard - users from same country
+        usersQuery = query(
+          collection(db, 'users'),
+          where('country', '==', user.country),
+          where('lifeScore', '>', 0),
+          orderBy('lifeScore', 'desc'),
+          limit(50)
+        );
+      } else if (activeTab === 'wealth') {
+        // Wealth leaderboard
+        usersQuery = query(
+          collection(db, 'users'),
+          where('wealth.total', '>', 0),
+          orderBy('wealth.total', 'desc'),
+          limit(50)
+        );
+      } else if (activeTab === 'knowledge') {
+        // Knowledge leaderboard
+        usersQuery = query(
+          collection(db, 'users'),
+          where('knowledge.total', '>', 0),
+          orderBy('knowledge.total', 'desc'),
+          limit(50)
+        );
+      } else {
+        // Global leaderboard - all users
+        usersQuery = query(
+          collection(db, 'users'),
+          where('lifeScore', '>', 0),
+          orderBy('lifeScore', 'desc'),
+          limit(50)
+        );
+      }
+
+      const querySnapshot = await getDocs(usersQuery);
+      
+      // Process real users
+      realEntries = querySnapshot.docs.map((doc, index) => {
+        const userData = doc.data() as User;
+        return {
+          rank: index + 1, // Temporary rank, will be recalculated after merging
+          user: {
+            ...userData,
+            id: doc.id,
+            uid: doc.id,
+            createdAt: userData.createdAt?.toDate() || new Date(),
+            lastActive: userData.lastActive?.toDate() || new Date()
+          },
+          score: activeTab === 'wealth' 
+            ? (userData.wealth?.total || 0) 
+            : activeTab === 'knowledge' 
+              ? (userData.knowledge?.total || 0) 
+              : (userData.lifeScore || 0),
+          change: Math.floor(Math.random() * 20) - 10, // Random change for demo
+          isNPC: false
+        };
+      });
+
+      // Combine static and real entries
+      let combinedEntries = [...staticEntries, ...realEntries];
+      
+      // Sort based on score
+      combinedEntries.sort((a, b) => b.score - a.score);
+      
+      // Reassign ranks after sorting
+      combinedEntries = combinedEntries.map((entry, index) => ({
+        ...entry,
+        rank: index + 1
+      }));
+
+      setLeaderboardData(combinedEntries);
     } catch (error) {
       console.error('Error loading leaderboard data:', error);
-      setLeaderboardData([]);
+      toast.error('Failed to load leaderboard data');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [activeTab, user]);
+
+  // Initial load and tab change
+  useEffect(() => {
+    loadLeaderboardData();
+  }, [loadLeaderboardData, activeTab]);
 
   const currentTab = tabs.find(tab => tab.id === activeTab);
 
   const handleUserClick = (clickedUser: User) => {
+    // Don't open modal for NPC users
+    if ((clickedUser as any).isNPC) {
+      return;
+    }
     setSelectedUser(clickedUser);
   };
 
@@ -124,7 +386,7 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
     return <span className="text-sm md:text-lg font-bold text-gray-300">#{rank}</span>;
   };
 
-  const getScoreDisplay = (entry: any) => {
+  const getScoreDisplay = (entry: LeaderboardEntry) => {
     switch (activeTab) {
       case 'wealth':
         return formatCurrency(entry.score);
@@ -135,7 +397,7 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
     }
   };
 
-  const getChangeDisplay = (entry: any) => {
+  const getChangeDisplay = (entry: LeaderboardEntry) => {
     switch (activeTab) {
       case 'wealth':
         return `${entry.change > 0 ? '+' : ''}${formatCurrency(entry.change)}`;
@@ -147,9 +409,13 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
   };
 
   // Get card styling based on rank
-  const getCardStyling = (rank: number, isCurrentUser: boolean) => {
+  const getCardStyling = (rank: number, isCurrentUser: boolean, isNPC: boolean = false) => {
     if (isCurrentUser) {
       return `bg-gradient-to-r ${currentTab?.color} bg-opacity-20 border-2 border-opacity-50 shadow-lg`;
+    }
+    
+    if (isNPC) {
+      return 'bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border-2 border-purple-400/40 shadow-lg';
     }
     
     // Top 3 positions - vibrant, cheerful colors
@@ -168,7 +434,11 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
   };
 
   // Get avatar styling based on rank
-  const getAvatarStyling = (rank: number) => {
+  const getAvatarStyling = (rank: number, isNPC: boolean = false) => {
+    if (isNPC) {
+      return 'bg-gradient-to-r from-purple-400 to-indigo-400 shadow-lg shadow-purple-400/30';
+    }
+    
     if (rank === 1) {
       return 'bg-gradient-to-r from-yellow-400 to-orange-400 shadow-lg shadow-yellow-400/30';
     }
@@ -203,7 +473,11 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
     return '';
   };
 
-  if (loading) {
+  const handleRefresh = () => {
+    loadLeaderboardData(true);
+  };
+
+  if (loading && leaderboardData.length === 0) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -217,7 +491,7 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
         
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" />
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-400" />
             <div className="text-gray-300">Loading leaderboards...</div>
           </div>
         </div>
@@ -234,10 +508,27 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
           </h1>
           <p className="text-gray-300 mt-2 text-sm md:text-base">Compete and climb the rankings!</p>
         </div>
-        <Button variant="secondary" icon={Filter} size="sm" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-sm">
-          <span className="hidden sm:inline">Filters</span>
-          <span className="sm:hidden">Filter</span>
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="text-gray-400 hover:text-white"
+            icon={refreshing ? Loader2 : RefreshCw}
+          >
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
+          <Button 
+            variant="secondary" 
+            icon={Filter} 
+            size="sm" 
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-sm"
+          >
+            <span className="hidden sm:inline">Filters</span>
+            <span className="sm:hidden">Filter</span>
+          </Button>
+        </div>
       </div>
 
       {/* Mobile-Optimized Tabs - Horizontal Scroll */}
@@ -292,7 +583,7 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
                       className="w-16 h-16 rounded-full object-cover border-2 border-white"
                     />
                   ) : (
-                    <Users className="w-8 h-8 text-white" />
+                    <UserIcon className="w-8 h-8 text-white" />
                   )}
                 </div>
                 
@@ -334,6 +625,14 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
         </Card>
       )}
 
+      {/* NPC Indicator - Only show for global leaderboard */}
+      {activeTab === 'global' && (
+        <div className="flex items-center justify-center space-x-2 bg-indigo-900/20 border border-indigo-500/30 rounded-lg p-3 text-indigo-300 text-sm">
+          <Info className="w-4 h-4" />
+          <span>Entries marked with <span className="bg-purple-500/20 px-2 py-0.5 rounded-full text-purple-300 text-xs font-semibold">NPC</span> are platform-generated inspirational figures</span>
+        </div>
+      )}
+
       {/* Leaderboard Content */}
       {leaderboardData.length > 0 ? (
         <Card className="p-3 md:p-6 bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm">
@@ -343,9 +642,9 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
                 key={`${entry.user.id}-${activeTab}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
+                transition={{ delay: index * 0.05 }}
                 className={`transition-all hover:scale-[1.02] rounded-xl p-4 ${
-                  getCardStyling(entry.rank, entry.user.id === user.id)
+                  getCardStyling(entry.rank, entry.user.id === user.id, entry.isNPC)
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -355,7 +654,7 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
                     </div>
                     
                     <div className="relative">
-                      <div className={`w-14 h-14 rounded-full flex items-center justify-center cursor-pointer ${getAvatarStyling(entry.rank)}`}
+                      <div className={`w-14 h-14 rounded-full flex items-center justify-center cursor-pointer ${getAvatarStyling(entry.rank, entry.isNPC)}`}
                            onClick={() => handleUserClick(entry.user)}>
                         {entry.user.avatar ? (
                           <img
@@ -364,7 +663,7 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
                             className="w-14 h-14 rounded-full object-cover border-2 border-white"
                           />
                         ) : (
-                          <Users className="w-7 h-7 text-white" />
+                          <UserIcon className="w-7 h-7 text-white" />
                         )}
                       </div>
                       
@@ -376,16 +675,32 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
                     </div>
                     
                     <div className="flex-1">
-                      <h3 className="font-bold text-white text-lg cursor-pointer hover:text-blue-300 transition-colors"
-                          onClick={() => handleUserClick(entry.user)}>
-                        {entry.user.name}
-                        {entry.user.id === user.id && (
-                          <span className={`ml-2 text-sm bg-gradient-to-r ${currentTab?.color} bg-clip-text text-transparent font-semibold`}>
-                            (You)
+                      <div className="flex items-center">
+                        <h3 className="font-bold text-white text-lg cursor-pointer hover:text-blue-300 transition-colors"
+                            onClick={() => handleUserClick(entry.user)}>
+                          {entry.user.name}
+                          {entry.user.id === user.id && (
+                            <span className={`ml-2 text-sm bg-gradient-to-r ${currentTab?.color} bg-clip-text text-transparent font-semibold`}>
+                              (You)
+                            </span>
+                          )}
+                        </h3>
+                        
+                        {/* NPC Badge */}
+                        {entry.isNPC && (
+                          <span className="ml-2 bg-purple-500/20 px-2 py-0.5 rounded-full text-purple-300 text-xs font-semibold">
+                            NPC
                           </span>
                         )}
-                      </h3>
+                      </div>
                       <p className="text-gray-400">{entry.user.country}</p>
+                      
+                      {/* Description for NPCs */}
+                      {entry.isNPC && (
+                        <p className="text-gray-400 text-sm italic">
+                          {(entry.user as any).description || "Inspirational figure"}
+                        </p>
+                      )}
                     </div>
                   </div>
                   
@@ -406,8 +721,8 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
                       </div>
                     </div>
 
-                    {/* Add Friend Button */}
-                    {entry.user.id !== user.id && (
+                    {/* Add Friend Button - Only for real users, not NPCs */}
+                    {entry.user.id !== user.id && !entry.isNPC && (
                       <Button
                         variant={getFriendButtonVariant(entry.user.id)}
                         size="sm"
@@ -469,7 +784,7 @@ const Leaderboards: React.FC<LeaderboardsProps> = ({ user }) => {
             {activeTab === 'friends' && '👥 Friend Circle'}
           </h3>
           <p className="text-gray-300 text-sm md:text-base">
-            {activeTab === 'global' && 'Compete against users worldwide'}
+            {activeTab === 'global' && 'Compete against users worldwide and inspirational figures'}
             {activeTab === 'local' && `See how you rank in ${user.city} and ${user.country}`}
             {activeTab === 'wealth' && 'Rankings based on total net worth'}
             {activeTab === 'knowledge' && 'Education, certificates, and skills combined'}
