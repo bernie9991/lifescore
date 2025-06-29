@@ -10,7 +10,7 @@ import {
   Activity,
   BarChart3,
   Target,
-  MessageSquare
+  User
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -29,6 +29,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
     { id: 'leaderboards', label: 'Leaderboards', icon: Trophy },
     { id: 'badges', label: 'Badges', icon: Award },
     { id: 'friends', label: 'Friends', icon: Users },
+    { id: 'profile', label: 'Profile', icon: User }
   ];
 
   return (
@@ -104,22 +105,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
               </motion.button>
             </li>
           ))}
-          
-          {/* My Posts Link */}
-          <li>
-            <motion.button
-              whileHover={{ x: 4 }}
-              onClick={() => onPageChange('profile')}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
-                currentPage === 'profile'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-              }`}
-            >
-              <MessageSquare className="w-5 h-5" />
-              <span>My Posts</span>
-            </motion.button>
-          </li>
         </ul>
       </nav>
 

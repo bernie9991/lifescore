@@ -90,11 +90,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         {/* Left Column */}
         <div className="lg:col-span-2 space-y-8">
           <RankingCards user={user} />
-          <LifeScoreMeter 
-            user={user} 
-            onViewAllMissions={onViewAllMissions}
-            onViewMission={handleViewMission}
-          />
+          <LifeScoreMeter user={user} />
         </div>
 
         {/* Right Column */}
