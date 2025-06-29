@@ -11,9 +11,9 @@ export const initializeRevenueCat = () => {
   
   try {
     console.log("Initializing RevenueCat with API key:", REVENUECAT_API_KEY);
-    Purchases.setDebugLogsEnabled(true); // Enable for testing
     Purchases.configure({
-      apiKey: REVENUECAT_API_KEY
+      apiKey: REVENUECAT_API_KEY,
+      debugLogsEnabled: true
     });
     console.log("RevenueCat initialized successfully");
   } catch (error) {
