@@ -230,19 +230,29 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
   };
 
   const handleToggleHabitSelection = (habitId: string) => {
+    console.log('🔍 HABIT SELECTION: Toggling habit:', habitId);
+    console.log('🔍 HABIT SELECTION: Current selected habits:', Array.from(selectedHabits));
+    
     setSelectedHabits(prev => {
       const newSet = new Set(prev);
       if (newSet.has(habitId)) {
+        console.log('🔍 HABIT SELECTION: Removing habit from selection');
         newSet.delete(habitId);
       } else {
+        console.log('🔍 HABIT SELECTION: Adding habit to selection');
         newSet.add(habitId);
       }
+      console.log('🔍 HABIT SELECTION: New selected habits:', Array.from(newSet));
       return newSet;
     });
   };
 
   const handleSaveSelectedHabits = () => {
+    console.log('🔍 HABIT SAVE: Saving selected habits:', Array.from(selectedHabits));
+    
     const selectedHabitData = availableHabits.filter(habit => selectedHabits.has(habit.id));
+    console.log('🔍 HABIT SAVE: Selected habit data:', selectedHabitData);
+    
     const newHabits: Habit[] = selectedHabitData.map(habit => ({
       id: `habit-${Date.now()}-${Math.random()}`,
       name: habit.name,
@@ -255,6 +265,8 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
       weeklyProgress: new Array(7).fill(0),
       successRate: 0
     }));
+
+    console.log('🔍 HABIT SAVE: New habits to add:', newHabits);
 
     setHabits(prev => [...prev, ...newHabits]);
     setSelectedHabits(new Set());
@@ -716,21 +728,40 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
                           const isSelected = selectedHabits.has(habit.id);
                           const isAlreadyAdded = habits.some(h => h.name === habit.name);
                           
+                          console.log('🔍 HABIT RENDER:', {
+                            habitId: habit.id,
+                            habitName: habit.name,
+                            isSelected,
+                            isAlreadyAdded,
+                            selectedHabitsArray: Array.from(selectedHabits)
+                          });
+                          
                           return (
                             <motion.div
                               key={habit.id}
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
                             >
-                              <Card 
-                                className={`p-4 border transition-all cursor-pointer ${
+                              <div
+                                className={`p-4 border transition-all cursor-pointer rounded-lg ${
                                   isAlreadyAdded 
                                     ? 'border-gray-500 bg-gray-700/50 opacity-50 cursor-not-allowed'
                                     : isSelected
                                     ? 'border-blue-500 bg-blue-500/20'
-                                    : 'border-gray-600 hover:border-blue-500/50'
+                                    : 'border-gray-600 hover:border-blue-500/50 bg-gray-900'
                                 }`}
-                                onClick={() => !isAlreadyAdded && handleToggleHabitSelection(habit.id)}
+                                onClick={() => {
+                                  console.log('🔍 HABIT CLICK:', {
+                                    habitId: habit.id,
+                                    habitName: habit.name,
+                                    isAlreadyAdded,
+                                    currentlySelected: selectedHabits.has(habit.id)
+                                  });
+                                  
+                                  if (!isAlreadyAdded) {
+                                    handleToggleHabitSelection(habit.id);
+                                  }
+                                }}
                               >
                                 <div className="flex items-center space-x-3">
                                   <div className="text-2xl">{habit.emoji}</div>
@@ -748,7 +779,7 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
                                     )}
                                   </div>
                                 </div>
-                              </Card>
+                              </div>
                             </motion.div>
                           );
                         })}
@@ -767,7 +798,10 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
                   <div className="flex space-x-3">
                     <Button
                       variant="secondary"
-                      onClick={() => setShowAddHabitModal(false)}
+                      onClick={() => {
+                        setSelectedHabits(new Set());
+                        setShowAddHabitModal(false);
+                      }}
                     >
                       Cancel
                     </Button>
