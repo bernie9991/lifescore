@@ -167,28 +167,48 @@ const Friends: React.FC<FriendsProps> = ({ user }) => {
     return () => unsubscribe();
   }, [user?.id]);
 
+  // Enhanced search function with partial matching
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
-      toast.error('Please enter a username to search');
+      toast.error('Please enter a name or username to search');
       return;
     }
 
     setSearching(true);
     try {
-      const q = query(
-        collection(db, 'users'),
-        where('username', '==', searchTerm.trim())
-      );
+      const searchQuery = searchTerm.trim().toLowerCase();
       
-      const querySnapshot = await getDocs(q);
+      // Get all users to perform client-side filtering
+      // Note: In a production app, you'd want server-side search with proper indexing
+      const usersCollection = collection(db, 'users');
+      const allUsersSnapshot = await getDocs(usersCollection);
+      
       const results: SearchResult[] = [];
       
-      querySnapshot.forEach((doc) => {
+      allUsersSnapshot.forEach((doc) => {
         const data = doc.data();
-        if (doc.id !== user.id) { // Don't include current user
+        if (doc.id === user.id) return; // Don't include current user
+        
+        const username = (data.username || '').toLowerCase();
+        const displayName = (data.name || '').toLowerCase();
+        
+        // Split the display name into parts for first/last name matching
+        const nameParts = displayName.split(' ').filter(part => part.length > 0);
+        
+        // Check if search term matches:
+        // 1. Username (partial match)
+        // 2. Full display name (partial match)
+        // 3. Any part of the name (first name, last name, etc.)
+        const matchesUsername = username.includes(searchQuery);
+        const matchesFullName = displayName.includes(searchQuery);
+        const matchesNamePart = nameParts.some(part => 
+          part.includes(searchQuery) || searchQuery.includes(part)
+        );
+        
+        if (matchesUsername || matchesFullName || matchesNamePart) {
           results.push({
             id: doc.id,
-            username: data.username,
+            username: data.username || 'Unknown',
             displayName: data.name || 'Unknown User',
             isRealNameVisible: data.isRealNameVisible || false,
             avatar: data.avatar
@@ -196,11 +216,38 @@ const Friends: React.FC<FriendsProps> = ({ user }) => {
         }
       });
 
+      // Sort results by relevance
+      results.sort((a, b) => {
+        const aUsername = a.username.toLowerCase();
+        const bUsername = b.username.toLowerCase();
+        const aDisplayName = a.displayName.toLowerCase();
+        const bDisplayName = b.displayName.toLowerCase();
+        
+        // Exact matches first
+        if (aUsername === searchQuery) return -1;
+        if (bUsername === searchQuery) return 1;
+        if (aDisplayName === searchQuery) return -1;
+        if (bDisplayName === searchQuery) return 1;
+        
+        // Username starts with search term
+        if (aUsername.startsWith(searchQuery) && !bUsername.startsWith(searchQuery)) return -1;
+        if (bUsername.startsWith(searchQuery) && !aUsername.startsWith(searchQuery)) return 1;
+        
+        // Display name starts with search term
+        if (aDisplayName.startsWith(searchQuery) && !bDisplayName.startsWith(searchQuery)) return -1;
+        if (bDisplayName.startsWith(searchQuery) && !aDisplayName.startsWith(searchQuery)) return 1;
+        
+        // Alphabetical order
+        return aDisplayName.localeCompare(bDisplayName);
+      });
+
       setSearchResults(results);
       
       if (results.length === 0) {
         // FIXED: Changed toast.info to toast (neutral message)
-        toast('No user found with that username');
+        toast('No users found matching your search');
+      } else {
+        toast.success(`Found ${results.length} user${results.length > 1 ? 's' : ''}`);
       }
     } catch (error) {
       console.error('Error searching users:', error);
@@ -336,6 +383,22 @@ const Friends: React.FC<FriendsProps> = ({ user }) => {
     return friend.isRealNameVisible ? friend.displayName : friend.username;
   };
 
+  // Helper function to highlight search matches
+  const highlightMatch = (text: string, searchTerm: string) => {
+    if (!searchTerm) return text;
+    
+    const regex = new RegExp(`(${searchTerm})`, 'gi');
+    const parts = text.split(regex);
+    
+    return parts.map((part, index) => 
+      regex.test(part) ? (
+        <span key={index} className="bg-yellow-200 text-gray-900 font-semibold rounded px-1">
+          {part}
+        </span>
+      ) : part
+    );
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -458,7 +521,7 @@ const Friends: React.FC<FriendsProps> = ({ user }) => {
                 </h3>
                 
                 <p className="text-gray-400 mb-6 leading-relaxed">
-                  Search for friends by username to start building your network!
+                  Search for friends by name or username to start building your network!
                 </p>
                 
                 <Button 
@@ -481,15 +544,18 @@ const Friends: React.FC<FriendsProps> = ({ user }) => {
           <Card className="p-4 md:p-6 bg-gradient-to-r from-blue-900/20 to-purple-900/20 border-blue-500/30">
             <h2 className="text-lg md:text-xl font-bold text-white mb-3 md:mb-4 flex items-center">
               <Search className="w-5 h-5 md:w-6 md:h-6 text-blue-400 mr-2" />
-              Find Friend by Username
+              Find Friends
             </h2>
+            <p className="text-blue-300 text-sm mb-4">
+              Search by name, username, or even just first/last name. We'll find matching users for you!
+            </p>
             <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4">
               <div className="flex-1">
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Enter username to search"
+                  placeholder="Enter name or username (e.g., 'John', 'Smith', 'john_doe')"
                   className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-base"
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 />
@@ -508,7 +574,9 @@ const Friends: React.FC<FriendsProps> = ({ user }) => {
           {/* Search Results */}
           {searchResults.length > 0 && (
             <Card className="p-4 md:p-6">
-              <h3 className="text-lg font-bold text-white mb-4">Search Results</h3>
+              <h3 className="text-lg font-bold text-white mb-4">
+                Search Results ({searchResults.length} found)
+              </h3>
               <div className="space-y-3">
                 {searchResults.map((result) => (
                   <div key={result.id} className="flex items-center justify-between bg-gray-900 p-4 rounded-lg">
@@ -526,9 +594,14 @@ const Friends: React.FC<FriendsProps> = ({ user }) => {
                       </div>
                       <div>
                         <h4 className="font-semibold text-white">
-                          {result.isRealNameVisible ? result.displayName : result.username}
+                          {highlightMatch(
+                            result.isRealNameVisible ? result.displayName : result.username,
+                            searchTerm
+                          )}
                         </h4>
-                        <p className="text-sm text-gray-400">@{result.username}</p>
+                        <p className="text-sm text-gray-400">
+                          @{highlightMatch(result.username, searchTerm)}
+                        </p>
                       </div>
                     </div>
                     <Button
