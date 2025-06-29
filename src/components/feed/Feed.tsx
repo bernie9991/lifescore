@@ -263,12 +263,17 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
       console.log(`📊 FEED: Query returned ${querySnapshot.docs.length} documents`);
       
       const items: FeedItem[] = [];
+      const seenIds = new Set<string>(); // Track seen post IDs to prevent duplicates
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         
         // Skip hidden posts
         if (hiddenPosts.has(doc.id)) return;
+        
+        // Skip duplicates
+        if (seenIds.has(doc.id)) return;
+        seenIds.add(doc.id);
         
         // Process comments to ensure they have proper timestamp objects
         const processedComments = (data.comments || []).map((comment: any) => ({
@@ -306,11 +311,27 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
       });
 
       if (isRefresh || !isLoadMore) {
+        // For refresh or initial load, replace all items
         setFeedItems(items);
         // Cache the results
         feedCache.set(cacheKey, items);
       } else {
-        setFeedItems(prev => [...prev, ...items]);
+        // For load more, append new items while ensuring no duplicates
+        setFeedItems(prev => {
+          // Create a map of existing items by ID for quick lookup
+          const existingItemsMap = new Map(prev.map(item => [item.id, item]));
+          
+          // Add only new items that don't already exist
+          items.forEach(item => {
+            if (!existingItemsMap.has(item.id)) {
+              existingItemsMap.set(item.id, item);
+            }
+          });
+          
+          // Convert map back to array and sort by timestamp (newest first)
+          return Array.from(existingItemsMap.values())
+            .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        });
       }
 
       // Update pagination state
@@ -631,7 +652,7 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
       toast.success('Comment added! 💬');
     } catch (error) {
       console.error('Error adding comment:', error);
-      toast.error('Failed to add comment');
+      toast.error(`Error adding comment: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }, [user]);
 
@@ -872,13 +893,12 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
         {feedItems.length > 0 ? (
           <div className="space-y-6">
             <AnimatePresence>
-              {feedItems.map((item, index) => (
+              {feedItems.map((item) => (
                 <motion.div
                   key={item.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  transition={{ delay: index * 0.05 }}
                 >
                   <AutomatedFeedPost
                     id={item.id}
