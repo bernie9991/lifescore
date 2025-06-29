@@ -188,6 +188,11 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
         setError(null);
       }
 
+      // Clear cache on refresh
+      if (isRefresh) {
+        feedCache.clear();
+      }
+
       // Check cache first for initial load
       const cacheKey = `${activeTab}-${user.id}-${filter}`;
       if (!isRefresh && !isLoadMore && feedCache.has(cacheKey)) {
@@ -205,9 +210,12 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
         const userData = userDoc.data();
         const friendIds = [...(userData?.friends || []), user.id]; // Include current user
         
-        if (friendIds.length === 0) {
+        if (friendIds.length <= 1) { // Only the current user
           setFeedItems([]);
           setHasMore(false);
+          setLoading(false);
+          setLoadingMore(false);
+          setRefreshing(false);
           return;
         }
 
@@ -247,7 +255,10 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
         );
       }
 
+      console.log('Executing feed query...');
       const querySnapshot = await getDocs(feedQuery);
+      console.log(`Query returned ${querySnapshot.docs.length} documents`);
+      
       const items: FeedItem[] = [];
 
       querySnapshot.forEach((doc) => {

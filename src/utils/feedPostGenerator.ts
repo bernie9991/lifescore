@@ -32,6 +32,8 @@ export const generateFeedPost = async (
   specificData?: any
 ): Promise<boolean> => {
   try {
+    console.log('Generating feed post:', { updateType, specificData });
+    
     // Check if we should create a post for this update
     const shouldCreatePost = determineIfPostNeeded(user, previousUser, updateType, specificData);
     
@@ -72,6 +74,7 @@ const determineIfPostNeeded = (
 ): boolean => {
   // Skip posts for users who haven't completed onboarding
   if (!user.username) {
+    console.log('User has not completed onboarding, skipping post');
     return false;
   }
 
@@ -98,8 +101,8 @@ const determineIfPostNeeded = (
       return percentChange >= 10;
       
     case UpdateType.ASSET_ADDED:
-      // Always post when a significant asset is added
-      return !!specificData && specificData.value >= 10000;
+      // Always post when an asset is added - removed minimum value requirement
+      return !!specificData;
       
     case UpdateType.PROFILE_PICTURE:
       // Only post if this is the first profile picture or a change after 30+ days
@@ -293,6 +296,8 @@ const updateExistingPost = async (postId: string, updateData: UpdateData) => {
  */
 const createNewFeedPost = async (user: User, updateData: UpdateData) => {
   try {
+    console.log('Creating new feed post:', updateData);
+    
     const feedItemData = {
       userId: user.id,
       userName: user.name,
@@ -316,8 +321,8 @@ const createNewFeedPost = async (user: User, updateData: UpdateData) => {
       ...updateData.metadata?.xpEarned && { xpEarned: updateData.metadata.xpEarned }
     };
     
-    await addDoc(collection(db, 'feedItems'), feedItemData);
-    console.log('Created new feed post for', user.name, 'of type', updateData.type);
+    const docRef = await addDoc(collection(db, 'feedItems'), feedItemData);
+    console.log('Created new feed post with ID:', docRef.id);
     return true;
   } catch (error) {
     console.error('Error creating feed post:', error);
