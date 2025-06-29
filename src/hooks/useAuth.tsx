@@ -23,6 +23,7 @@ import { auth, db } from '../lib/firebase';
 import { User } from '../types';
 import { updateUserLifeScore } from '../utils/lifeScoreEngine';
 import { checkBadgeUnlocks, getDefaultBadgesForNewUser, ALL_BADGES } from '../utils/badgeSystem';
+import { generateFeedPost, UpdateType } from '../utils/feedPostGenerator';
 import toast from 'react-hot-toast';
 
 // Enhanced timeout configuration
@@ -716,6 +717,9 @@ export const useAuthProvider = () => {
     try {
       authLogger.debug('Updating user', userData);
       
+      // Store previous user state for comparison
+      const previousUser = { ...user };
+      
       // Create an updated user object for local calculations (LifeScore, badges)
       const updatedUser = { ...user, ...userData };
       const userWithScore = updateUserLifeScore(updatedUser); // Assuming this updates lifeScore correctly
@@ -749,12 +753,78 @@ export const useAuthProvider = () => {
             badgeId: badge.id,
             unlockedAt: serverTimestamp() // Use Firestore server timestamp
           });
+          
+          // Generate feed post for badge unlock
+          await generateFeedPost(userWithScore, previousUser, UpdateType.BADGE_EARNED, badge);
         }
         // Update newlyUnlockedBadges state for UI display
         setNewlyUnlockedBadges(newBadges);
         toast.success(`🎉 ${newBadges.length} new badge${newBadges.length > 1 ? 's' : ''} unlocked!`);
       }
       // --- END NEW, CLEANED BADGE SAVING LOGIC ---
+
+      // Check for profile updates that should generate feed posts
+      
+      // Check for certification updates
+      if (userData.knowledge?.certificates && 
+          previousUser.knowledge?.certificates && 
+          userData.knowledge.certificates.length > previousUser.knowledge.certificates.length) {
+        // Find new certificates
+        const newCerts = userData.knowledge.certificates.filter(
+          cert => !previousUser.knowledge?.certificates.includes(cert)
+        );
+        
+        for (const cert of newCerts) {
+          await generateFeedPost(userWithScore, previousUser, UpdateType.CERTIFICATION_ADDED, { certName: cert });
+        }
+      }
+      
+      // Check for language updates
+      if (userData.knowledge?.languages && 
+          previousUser.knowledge?.languages && 
+          userData.knowledge.languages.length > previousUser.knowledge.languages.length) {
+        // Find new languages
+        const newLanguages = userData.knowledge.languages.filter(
+          lang => !previousUser.knowledge?.languages.includes(lang)
+        );
+        
+        for (const language of newLanguages) {
+          await generateFeedPost(userWithScore, previousUser, UpdateType.LANGUAGE_ADDED, { language });
+        }
+      }
+      
+      // Check for education updates
+      if (userData.knowledge?.education && 
+          userData.knowledge.education !== previousUser.knowledge?.education) {
+        await generateFeedPost(userWithScore, previousUser, UpdateType.EDUCATION_UPDATE, { 
+          education: userData.knowledge.education 
+        });
+      }
+      
+      // Check for wealth updates
+      if (userData.wealth && previousUser.wealth && 
+          userData.wealth.total !== previousUser.wealth.total) {
+        await generateFeedPost(userWithScore, previousUser, UpdateType.WEALTH_UPDATE);
+      }
+      
+      // Check for new assets
+      if (userData.assets && 
+          previousUser.assets && 
+          userData.assets.length > previousUser.assets.length) {
+        // Find new assets
+        const newAssets = userData.assets.filter(
+          asset => !previousUser.assets?.some(a => a.id === asset.id)
+        );
+        
+        for (const asset of newAssets) {
+          await generateFeedPost(userWithScore, previousUser, UpdateType.ASSET_ADDED, asset);
+        }
+      }
+      
+      // Check for profile picture updates
+      if (userData.avatar && userData.avatar !== previousUser.avatar) {
+        await generateFeedPost(userWithScore, previousUser, UpdateType.PROFILE_PICTURE);
+      }
 
       // Update user's local state (after badges are processed)
       setUser(userWithScore);

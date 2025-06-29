@@ -1,6 +1,37 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, MessageCircle, Trophy, TrendingUp, Award, Users, UserPlus, Eye, Sprout, CheckCircle, MapPin, Clock, Laugh, Angry, Clapperboard as Clap, Heart, Plus, Target, Crown, Zap, Globe, Star, Calendar, Send, ChevronDown, ChevronUp, RefreshCw, Loader2 } from 'lucide-react';
+import { 
+  Activity, 
+  MessageCircle, 
+  Trophy, 
+  TrendingUp, 
+  Award, 
+  Users, 
+  UserPlus, 
+  Eye, 
+  Sprout, 
+  CheckCircle, 
+  MapPin, 
+  Clock, 
+  Laugh, 
+  Angry, 
+  Clapperboard as Clap, 
+  Heart, 
+  Plus, 
+  Target, 
+  Crown, 
+  Zap, 
+  Globe, 
+  Star, 
+  Calendar, 
+  Send, 
+  ChevronDown, 
+  ChevronUp, 
+  RefreshCw, 
+  Loader2,
+  Filter,
+  EyeOff
+} from 'lucide-react';
 import { User } from '../../types';
 import { formatNumber, triggerEmojiConfetti } from '../../utils/animations';
 import Card from '../common/Card';
@@ -25,9 +56,15 @@ import {
   serverTimestamp,
   updateDoc,
   arrayUnion,
-  arrayRemove
+  arrayRemove,
+  deleteDoc
 } from 'firebase/firestore';
 import toast from 'react-hot-toast';
+import FeedPostGenerator from './FeedPostGenerator';
+import AutomatedFeedPost from './AutomatedFeedPost';
+import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
+import { feedCache } from './FeedCache';
 
 interface FeedProps {
   user: User;
@@ -40,8 +77,8 @@ interface FeedItem {
   userAvatar?: string;
   city: string;
   country: string;
-  badge?: { icon: string; name: string };
-  type: 'badge-earned' | 'rank-change' | 'goal-completed' | 'certificate-added' | 'item-added' | 'income-update' | 'profile-update' | 'achievement';
+  badge?: { icon: string; name: string; rarity: string };
+  type: 'badge-earned' | 'rank-change' | 'goal-completed' | 'certification-added' | 'item-added' | 'income-update' | 'profile-update' | 'achievement' | 'wealth-update' | 'asset-added' | 'language-added' | 'education-update' | 'profile-picture';
   title: string;
   subtitle: string;
   content: string;
@@ -58,6 +95,7 @@ interface FeedItem {
   visual?: string;
   comments: Comment[];
   metadata?: any;
+  isHidden?: boolean;
 }
 
 interface Comment {
@@ -70,14 +108,20 @@ interface Comment {
   likes: number;
 }
 
-interface ReactionType {
+interface Challenge {
   id: string;
-  type: string;
-  icon: React.ComponentType<any>;
-  label: string;
-  color: string;
-  bgColor: string;
-  emoji: string;
+  title: string;
+  description: string;
+  type: 'weekly' | 'monthly' | 'special';
+  participants: number;
+  reward: string;
+  endDate: Date;
+  leaderboard: Array<{
+    rank: number;
+    name: string;
+    score: number;
+    avatar?: string;
+  }>;
 }
 
 const Feed: React.FC<FeedProps> = ({ user }) => {
@@ -91,26 +135,45 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
   const [userReactions, setUserReactions] = useState<Record<string, string>>({});
   const [seededPosts, setSeededPosts] = useState<Set<string>>(new Set());
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [friends, setFriends] = useState<Set<string>>(new Set(user.friends || []));
   const [friendRequests, setFriendRequests] = useState<Set<string>>(new Set());
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
   const [newComments, setNewComments] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [hiddenPosts, setHiddenPosts] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState<string>('all');
 
   // Refs for infinite scroll
   const feedContainerRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
 
-  // Cache for feed items
-  const feedCacheRef = useRef<Map<string, FeedItem[]>>(new Map());
-
-  const reactions: ReactionType[] = [
+  const reactions = [
     { id: 'haha', type: 'haha', icon: Laugh, label: 'Haha', color: 'text-yellow-400', bgColor: 'bg-yellow-400/20 border-yellow-400/40', emoji: '😂' },
     { id: 'angry', type: 'angry', icon: Angry, label: 'Angry', color: 'text-red-400', bgColor: 'bg-red-400/20 border-red-400/40', emoji: '😠' },
     { id: 'applause', type: 'applause', icon: Clap, label: 'Applause', color: 'text-green-400', bgColor: 'bg-green-400/20 border-green-400/40', emoji: '👏' },
     { id: 'kudos', type: 'kudos', icon: Heart, label: 'Kudos', color: 'text-pink-400', bgColor: 'bg-pink-400/20 border-pink-400/40', emoji: '❤️' }
   ];
+
+  // Set up infinite scroll
+  const { loadMoreRef } = useInfiniteScroll({
+    hasMore,
+    loading: loadingMore,
+    onLoadMore: () => loadFeedData(false, true)
+  });
+
+  // Set up pull-to-refresh
+  const { 
+    containerRef, 
+    isRefreshing, 
+    pullToRefreshStyle, 
+    refreshIndicatorStyle, 
+    shouldShowRefreshIndicator 
+  } = usePullToRefresh({
+    onRefresh: () => loadFeedData(true),
+    enabled: !loading && !loadingMore
+  });
 
   // Load feed data with pagination
   const loadFeedData = useCallback(async (isRefresh = false, isLoadMore = false) => {
@@ -126,10 +189,10 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
       }
 
       // Check cache first for initial load
-      const cacheKey = `${activeTab}-${user.id}`;
-      if (!isRefresh && !isLoadMore && feedCacheRef.current.has(cacheKey)) {
-        const cachedItems = feedCacheRef.current.get(cacheKey)!;
-        setFeedItems(cachedItems);
+      const cacheKey = `${activeTab}-${user.id}-${filter}`;
+      if (!isRefresh && !isLoadMore && feedCache.has(cacheKey)) {
+        const cachedItems = feedCache.get<FeedItem[]>(cacheKey)!;
+        setFeedItems(cachedItems.filter(item => !hiddenPosts.has(item.id)));
         setLoading(false);
         return;
       }
@@ -174,11 +237,25 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
         );
       }
 
+      // Apply filters if needed
+      if (filter !== 'all') {
+        feedQuery = query(
+          collection(db, 'feedItems'),
+          where('type', '==', filter),
+          orderBy('timestamp', 'desc'),
+          limit(20)
+        );
+      }
+
       const querySnapshot = await getDocs(feedQuery);
       const items: FeedItem[] = [];
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
+        
+        // Skip hidden posts
+        if (hiddenPosts.has(doc.id)) return;
+        
         items.push({
           id: doc.id,
           userId: data.userId,
@@ -189,7 +266,7 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
           badge: data.badge,
           type: data.type,
           title: data.title,
-          subtitle: data.subtitle,
+          subtitle: data.subtitle || '',
           content: data.content,
           smartStat: data.smartStat,
           xpEarned: data.xpEarned,
@@ -210,7 +287,7 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
       if (isRefresh || !isLoadMore) {
         setFeedItems(items);
         // Cache the results
-        feedCacheRef.current.set(cacheKey, items);
+        feedCache.set(cacheKey, items);
       } else {
         setFeedItems(prev => [...prev, ...items]);
       }
@@ -228,40 +305,34 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
       setLoadingMore(false);
       setRefreshing(false);
     }
-  }, [activeTab, user.id, lastDoc]);
+  }, [activeTab, user.id, lastDoc, filter, hiddenPosts]);
 
   // Initial load and tab change
   useEffect(() => {
     setLastDoc(null);
     setHasMore(true);
     loadFeedData();
-  }, [activeTab, user.id]);
+  }, [activeTab, user.id, filter]);
 
-  // Infinite scroll setup
+  // Load hidden posts from localStorage
   useEffect(() => {
-    if (!loadMoreTriggerRef.current) return;
-
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting && hasMore && !loading && !loadingMore) {
-          loadFeedData(false, true);
-        }
-      },
-      {
-        threshold: 0.1,
-        rootMargin: '100px'
+    const savedHiddenPosts = localStorage.getItem(`hidden_posts_${user.id}`);
+    if (savedHiddenPosts) {
+      try {
+        const parsedHiddenPosts = JSON.parse(savedHiddenPosts);
+        setHiddenPosts(new Set(parsedHiddenPosts));
+      } catch (error) {
+        console.error('Error loading hidden posts:', error);
       }
-    );
+    }
+  }, [user.id]);
 
-    observerRef.current.observe(loadMoreTriggerRef.current);
-
-    return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-      }
-    };
-  }, [hasMore, loading, loadingMore, loadFeedData]);
+  // Save hidden posts to localStorage
+  useEffect(() => {
+    if (hiddenPosts.size > 0) {
+      localStorage.setItem(`hidden_posts_${user.id}`, JSON.stringify([...hiddenPosts]));
+    }
+  }, [hiddenPosts, user.id]);
 
   // Pull to refresh
   const handleRefresh = useCallback(() => {
@@ -467,7 +538,7 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
     setSelectedUser(mockUser);
   }, []);
 
-  // Handle comment toggle
+  // Handle toggle comments
   const handleToggleComments = useCallback((postId: string) => {
     setExpandedComments(prev => {
       const newSet = new Set(prev);
@@ -522,6 +593,58 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
     }
   }, [newComments, user]);
 
+  // Handle hide post
+  const handleHidePost = useCallback((postId: string) => {
+    setHiddenPosts(prev => new Set([...prev, postId]));
+    setFeedItems(prev => prev.filter(item => item.id !== postId));
+    toast.success('Post hidden');
+  }, []);
+
+  // Handle create post
+  const handleCreatePost = useCallback(async (postData: any) => {
+    try {
+      // Add timestamp and other required fields
+      const feedItemData = {
+        ...postData,
+        timestamp: serverTimestamp(),
+        isSelfDeclared: true,
+        seedCount: 0,
+        seededBy: [],
+        isVerified: false,
+        isAdminVerified: false,
+        reactions: {},
+        comments: []
+      };
+      
+      // Add to Firestore
+      const docRef = await addDoc(collection(db, 'feedItems'), feedItemData);
+      
+      // Update local state
+      const newItem: FeedItem = {
+        id: docRef.id,
+        ...feedItemData,
+        timestamp: new Date(),
+        isSelfDeclared: true,
+        seedCount: 0,
+        seededBy: [],
+        isVerified: false,
+        isAdminVerified: false,
+        reactions: {},
+        comments: []
+      };
+      
+      setFeedItems(prev => [newItem, ...prev]);
+      toast.success('Post created successfully! 🎉');
+      
+      // Clear cache to ensure fresh data on next load
+      feedCache.clear();
+      
+    } catch (error) {
+      console.error('Error creating post:', error);
+      toast.error('Failed to create post');
+    }
+  }, []);
+
   // Get time ago
   const getTimeAgo = useCallback((date: Date) => {
     const now = new Date();
@@ -551,6 +674,16 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
     return post.userId === user.id || friends.has(post.userId);
   }, [user.id, friends]);
 
+  // Filter options
+  const filterOptions = [
+    { id: 'all', label: 'All Updates' },
+    { id: 'badge-earned', label: 'Badges' },
+    { id: 'certification-added', label: 'Certifications' },
+    { id: 'wealth-update', label: 'Wealth Updates' },
+    { id: 'asset-added', label: 'Assets' },
+    { id: 'language-added', label: 'Languages' }
+  ];
+
   if (loading && feedItems.length === 0) {
     return (
       <div className="space-y-6">
@@ -565,7 +698,7 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
         
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <Loader2 className="w-8 h-8 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" />
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-400" />
             <div className="text-gray-300">Loading feed...</div>
           </div>
         </div>
@@ -574,7 +707,7 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
   }
 
   return (
-    <div className="space-y-6" ref={feedContainerRef}>
+    <div className="space-y-6" ref={containerRef}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-red-400 bg-clip-text text-transparent">
@@ -583,18 +716,48 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
           <p className="text-gray-300 mt-2 text-sm md:text-base">Stay updated with achievements, challenges, and leaderboards</p>
         </div>
         
-        {/* Refresh Button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="text-gray-400 hover:text-white"
-          icon={refreshing ? Loader2 : RefreshCw}
-          aria-label="Refresh feed"
-        >
-          {refreshing ? 'Refreshing...' : 'Refresh'}
-        </Button>
+        <div className="flex items-center space-x-2">
+          {/* Filter Button */}
+          <div className="relative group">
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={Filter}
+              className="text-gray-400 hover:text-white"
+              aria-label="Filter feed"
+            >
+              Filter
+            </Button>
+            
+            {/* Filter Dropdown */}
+            <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 hidden group-hover:block">
+              {filterOptions.map(option => (
+                <button
+                  key={option.id}
+                  onClick={() => setFilter(option.id)}
+                  className={`w-full text-left px-4 py-2 hover:bg-gray-700 transition-colors ${
+                    filter === option.id ? 'text-blue-400 font-semibold' : 'text-gray-300'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Refresh Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="text-gray-400 hover:text-white"
+            icon={refreshing ? Loader2 : RefreshCw}
+            aria-label="Refresh feed"
+          >
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
+        </div>
       </div>
 
       {/* Global Standing Section */}
@@ -634,6 +797,29 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
         </button>
       </div>
 
+      {/* Post Creator */}
+      <FeedPostGenerator user={user} onGeneratePost={handleCreatePost} />
+
+      {/* Pull to refresh indicator */}
+      {shouldShowRefreshIndicator && (
+        <div 
+          className="flex justify-center items-center py-4 text-blue-400"
+          style={refreshIndicatorStyle}
+        >
+          {isRefreshing ? (
+            <div className="flex items-center space-x-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Refreshing...</span>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <RefreshCw className="w-5 h-5" />
+              <span>Pull to refresh</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Error State */}
       {error && (
         <Card className="p-6 bg-red-900/20 border-red-500/30">
@@ -647,308 +833,109 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
       )}
 
       {/* Feed Content */}
-      {feedItems.length > 0 ? (
-        <div className="space-y-6">
-          <AnimatePresence>
-            {feedItems.map((item, index) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <Card className="p-6 bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm hover:shadow-xl transition-all">
-                  {/* Post Header */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div 
-                      className="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => handleUserClick(item)}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`View ${item.userName}'s profile`}
-                    >
-                      <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                        {item.userAvatar ? (
-                          <img
-                            src={item.userAvatar}
-                            alt={item.userName}
-                            className="w-12 h-12 rounded-full object-cover"
-                          />
-                        ) : (
-                          <Users className="w-6 h-6 text-white" />
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-white hover:text-blue-300 transition-colors">
-                          {item.userName}
-                        </h3>
-                        <div className="flex items-center text-gray-400 text-sm">
-                          <MapPin className="w-3 h-3 mr-1" />
-                          {item.city}, {item.country}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <div className="text-gray-400 text-sm flex items-center">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {getTimeAgo(item.timestamp)}
-                      </div>
-                      
-                      {/* Add Friend Button */}
-                      {item.userId !== user.id && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          icon={UserPlus}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddFriend(item.userId);
-                          }}
-                          disabled={friends.has(item.userId) || friendRequests.has(item.userId)}
-                          className={`text-xs ${
-                            friends.has(item.userId) 
-                              ? 'text-green-400 cursor-default' 
-                              : friendRequests.has(item.userId)
-                              ? 'text-gray-400 cursor-default'
-                              : 'text-blue-400 hover:text-blue-300'
-                          }`}
-                          aria-label={
-                            friends.has(item.userId) ? 'Already friends' :
-                            friendRequests.has(item.userId) ? 'Request sent' :
-                            'Add friend'
-                          }
-                        >
-                          {friends.has(item.userId) ? 'Friends' :
-                           friendRequests.has(item.userId) ? 'Sent' : 'Add'}
-                        </Button>
-                      )}
-                    </div>
+      <div style={pullToRefreshStyle}>
+        {feedItems.length > 0 ? (
+          <div className="space-y-6">
+            <AnimatePresence>
+              {feedItems.map((item, index) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ delay: index * 0.05 }}
+                >
+                  <AutomatedFeedPost
+                    id={item.id}
+                    userId={item.userId}
+                    userName={item.userName}
+                    userAvatar={item.userAvatar}
+                    city={item.city}
+                    country={item.country}
+                    type={item.type}
+                    title={item.title}
+                    content={item.content}
+                    timestamp={item.timestamp}
+                    metadata={item.metadata}
+                    badge={item.badge}
+                    xpEarned={item.xpEarned}
+                    reactions={item.reactions}
+                    comments={item.comments}
+                    onUserClick={() => handleUserClick(item)}
+                    onReaction={(type) => handleReaction(item.id, type)}
+                    onComment={(content) => {
+                      setNewComments({ ...newComments, [item.id]: content });
+                      handleAddComment(item.id);
+                    }}
+                    onSeed={shouldShowSeedButton(item) ? () => handleSeed(item.id) : undefined}
+                    onHidePost={() => handleHidePost(item.id)}
+                    currentUserId={user.id}
+                    isFriend={friends.has(item.userId)}
+                    canSeed={shouldShowSeedButton(item)}
+                    seedCount={item.seedCount}
+                    isSeeded={item.seededBy.includes(user.id)}
+                    showComments={expandedComments.has(item.id)}
+                    onToggleComments={() => handleToggleComments(item.id)}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {/* Load More Trigger */}
+            {hasMore && (
+              <div ref={loadMoreRef} className="flex justify-center py-8">
+                {loadingMore ? (
+                  <div className="flex items-center space-x-2 text-gray-400">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Loading more posts...</span>
                   </div>
-
-                  {/* Post Content */}
-                  <div className="mb-4">
-                    <h4 className="text-lg font-bold text-white mb-2">{item.title}</h4>
-                    <p className="text-gray-300 mb-2">{item.content}</p>
-                    {item.smartStat && (
-                      <div className="text-blue-400 font-semibold">{item.smartStat}</div>
-                    )}
-                    {item.xpEarned && (
-                      <div className="text-yellow-400 font-semibold">+{formatNumber(item.xpEarned)} XP</div>
-                    )}
-                  </div>
-
-                  {/* Badge Display */}
-                  {item.badge && (
-                    <div className="mb-4 p-3 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/40 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <span className="text-2xl">{item.badge.icon}</span>
-                        <div>
-                          <div className="font-bold text-yellow-400">{item.badge.name}</div>
-                          <div className="text-yellow-300 text-sm">Badge Unlocked!</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Post Actions */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-700">
-                    {/* Reactions */}
-                    <div className="flex items-center space-x-2">
-                      {reactions.map((reaction) => {
-                        const count = getReactionCount(item.reactions, reaction.type);
-                        const hasReacted = hasUserReacted(item.reactions, reaction.type);
-                        
-                        return (
-                          <button
-                            key={reaction.id}
-                            onClick={() => handleReaction(item.id, reaction.type)}
-                            className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-all hover:scale-105 ${
-                              hasReacted 
-                                ? `${reaction.bgColor} ${reaction.color} border` 
-                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            }`}
-                            aria-label={`${reaction.label} reaction${count > 0 ? ` (${count})` : ''}`}
-                          >
-                            <reaction.icon className="w-4 h-4" />
-                            <span>{count > 0 ? count : ''}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Seed and Comments */}
-                    <div className="flex items-center space-x-3">
-                      {/* Seed Button (only for friends and own posts) */}
-                      {shouldShowSeedButton(item) && (
-                        <button
-                          onClick={() => handleSeed(item.id)}
-                          className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-all ${
-                            seededPosts.has(item.id)
-                              ? 'bg-green-500/20 text-green-400 border border-green-400/40'
-                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                          }`}
-                          aria-label={`${seededPosts.has(item.id) ? 'Remove seed' : 'Seed post'} (${item.seedCount} seeds)`}
-                        >
-                          <Sprout className="w-4 h-4" />
-                          <span>{item.seedCount}</span>
-                        </button>
-                      )}
-
-                      {/* Comments Button */}
-                      <button
-                        onClick={() => handleToggleComments(item.id)}
-                        className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 transition-all"
-                        aria-label={`${expandedComments.has(item.id) ? 'Hide' : 'Show'} comments (${item.comments.length})`}
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                        <span>{item.comments.length}</span>
-                        {expandedComments.has(item.id) ? (
-                          <ChevronUp className="w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="w-3 h-3" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Comments Section */}
-                  <AnimatePresence>
-                    {expandedComments.has(item.id) && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mt-4 pt-4 border-t border-gray-700"
-                      >
-                        {/* Add Comment */}
-                        <div className="flex space-x-3 mb-4">
-                          <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                            {user.avatar ? (
-                              <img
-                                src={user.avatar}
-                                alt={user.name}
-                                className="w-8 h-8 rounded-full object-cover"
-                              />
-                            ) : (
-                              <Users className="w-4 h-4 text-white" />
-                            )}
-                          </div>
-                          <div className="flex-1 flex space-x-2">
-                            <input
-                              type="text"
-                              value={newComments[item.id] || ''}
-                              onChange={(e) => setNewComments(prev => ({
-                                ...prev,
-                                [item.id]: e.target.value
-                              }))}
-                              placeholder="Add a comment..."
-                              className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                              onKeyPress={(e) => e.key === 'Enter' && handleAddComment(item.id)}
-                              aria-label="Add a comment"
-                            />
-                            <Button
-                              size="sm"
-                              onClick={() => handleAddComment(item.id)}
-                              disabled={!newComments[item.id]?.trim()}
-                              icon={Send}
-                              aria-label="Send comment"
-                            >
-                              Send
-                            </Button>
-                          </div>
-                        </div>
-
-                        {/* Comments List */}
-                        <div className="space-y-3">
-                          {item.comments.map((comment) => (
-                            <div key={comment.id} className="flex space-x-3">
-                              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                                {comment.userAvatar ? (
-                                  <img
-                                    src={comment.userAvatar}
-                                    alt={comment.userName}
-                                    className="w-8 h-8 rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <Users className="w-4 h-4 text-white" />
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <div className="bg-gray-700 rounded-lg p-3">
-                                  <div className="font-semibold text-white text-sm">{comment.userName}</div>
-                                  <div className="text-gray-300 text-sm">{comment.content}</div>
-                                </div>
-                                <div className="text-gray-400 text-xs mt-1 ml-3">
-                                  {getTimeAgo(comment.timestamp)}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </Card>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-
-          {/* Load More Trigger */}
-          {hasMore && (
-            <div ref={loadMoreTriggerRef} className="flex justify-center py-8">
-              {loadingMore ? (
-                <div className="flex items-center space-x-2 text-gray-400">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Loading more posts...</span>
+                ) : (
+                  <div className="text-gray-500 text-sm">Scroll for more posts</div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Empty Feed State */
+          <div className="text-center py-16">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="max-w-md mx-auto"
+            >
+              <div className="w-24 h-24 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Activity className="w-12 h-12 text-purple-400" />
+              </div>
+              
+              <h3 className="text-2xl font-bold text-white mb-4">
+                {activeTab === 'friends' ? 'No friend activity yet' : 'No feed events yet'}
+              </h3>
+              
+              <p className="text-gray-400 mb-8 leading-relaxed">
+                {activeTab === 'friends' 
+                  ? 'Add friends to see their achievements and updates in your feed.'
+                  : 'Start your LifeScore journey! Update your profile, add assets, or earn badges to see activity in your feed.'
+                }
+              </p>
+              
+              <div className="space-y-3">
+                <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
+                  <Trophy className="w-4 h-4" />
+                  <span>Earn badges to create feed posts</span>
                 </div>
-              ) : (
-                <div className="text-gray-500 text-sm">Scroll for more posts</div>
-              )}
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Empty Feed State */
-        <div className="text-center py-16">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="max-w-md mx-auto"
-          >
-            <div className="w-24 h-24 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Activity className="w-12 h-12 text-purple-400" />
-            </div>
-            
-            <h3 className="text-2xl font-bold text-white mb-4">
-              {activeTab === 'friends' ? 'No friend activity yet' : 'No feed events yet'}
-            </h3>
-            
-            <p className="text-gray-400 mb-8 leading-relaxed">
-              {activeTab === 'friends' 
-                ? 'Add friends to see their achievements and updates in your feed.'
-                : 'Start your LifeScore journey! Update your profile, add assets, or earn badges to see activity in your feed.'
-              }
-            </p>
-            
-            <div className="space-y-3">
-              <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
-                <Trophy className="w-4 h-4" />
-                <span>Earn badges to create feed posts</span>
+                <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
+                  <Users className="w-4 h-4" />
+                  <span>Add friends to see their achievements</span>
+                </div>
+                <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
+                  <TrendingUp className="w-4 h-4" />
+                  <span>Update your profile to track progress</span>
+                </div>
               </div>
-              <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
-                <Users className="w-4 h-4" />
-                <span>Add friends to see their achievements</span>
-              </div>
-              <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
-                <TrendingUp className="w-4 h-4" />
-                <span>Update your profile to track progress</span>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
+            </motion.div>
+          </div>
+        )}
+      </div>
 
       {/* User Profile Modal */}
       {selectedUser && (
@@ -959,6 +946,20 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
           currentUser={user}
           onAddFriend={handleAddFriend}
           isFriend={friends.has(selectedUser.id)}
+        />
+      )}
+
+      {/* Challenge Modal */}
+      {selectedChallenge && (
+        <ChallengeModal
+          isOpen={!!selectedChallenge}
+          onClose={() => setSelectedChallenge(null)}
+          challenge={selectedChallenge}
+          onJoin={() => {
+            toast.success(`Joined ${selectedChallenge.title}! 🎉`);
+            triggerEmojiConfetti('applause');
+            setSelectedChallenge(null);
+          }}
         />
       )}
     </div>
