@@ -1,7 +1,7 @@
 import * as Purchases from '@revenuecat/purchases-js';
 
-// This is a placeholder. I will replace it with my real key.
-const REVENUECAT_API_KEY = "REPLACE_WITH_YOUR_PUBLIC_STRIPE_API_KEY";
+// RevenueCat API key
+const REVENUECAT_API_KEY = "rcb_NuecjNKbQSeWwmTaHcWCBZKpGyvS";
 
 export const initializeRevenueCat = () => {
   if (REVENUECAT_API_KEY.startsWith("REPLACE")) {
