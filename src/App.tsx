@@ -122,7 +122,7 @@ function App() {
     <Router>
       <AppContent />
     </Router>
-      import { initializeRevenueCat } from './lib/revenuecat';
+     
   );
 }
 
