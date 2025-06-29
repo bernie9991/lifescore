@@ -1,4 +1,4 @@
-import Purchases from '@revenuecat/purchases-js';
+import * as Purchases from '@revenuecat/purchases-js';
 
 // This is a placeholder. I will replace it with my real key.
 const REVENUECAT_API_KEY = "REPLACE_WITH_YOUR_PUBLIC_STRIPE_API_KEY";
