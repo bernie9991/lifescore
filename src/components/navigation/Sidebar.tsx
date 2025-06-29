@@ -111,7 +111,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
               whileHover={{ x: 4 }}
               onClick={() => onPageChange('profile')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
-                currentPage === 'profile' && activeTab === 'my-posts'
+                currentPage === 'profile'
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-300 hover:bg-gray-700 hover:text-white'
               }`}
