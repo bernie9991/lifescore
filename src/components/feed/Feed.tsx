@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Activity, 
   MessageCircle, 
@@ -7,7 +7,6 @@ import {
   TrendingUp, 
   Award,
   Users,
-  Filter,
   UserPlus,
   Eye,
   Sprout,
@@ -232,12 +231,15 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
     // Create a mock user object from post data
     const mockUser: User = {
       id: post.userId,
+      uid: post.userId,
       name: post.userName,
       email: `${post.userName.toLowerCase().replace(' ', '.')}@example.com`,
       avatar: post.userAvatar,
       country: post.country,
       city: post.city,
       lifeScore: Math.floor(Math.random() * 10000) + 5000,
+      username: `${post.userName.toLowerCase().replace(' ', '')}${Math.floor(Math.random() * 1000)}`,
+      isRealNameVisible: true,
       wealth: {
         salary: Math.floor(Math.random() * 100000) + 50000,
         savings: Math.floor(Math.random() * 50000) + 10000,
@@ -255,7 +257,8 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
       badges: [],
       friends: [],
       createdAt: new Date('2024-01-01'),
-      lastActive: new Date()
+      lastActive: new Date(),
+      role: 'user'
     };
     
     setSelectedUser(mockUser);
@@ -349,9 +352,6 @@ const Feed: React.FC<FeedProps> = ({ user }) => {
           </h1>
           <p className="text-gray-300 mt-2 text-sm md:text-base">Stay updated with achievements, challenges, and leaderboards</p>
         </div>
-        <Button variant="secondary" icon={Filter} className="bg-gradient-to-r from-purple-600 to-pink-600 text-sm">
-          <span className="hidden sm:inline">Filters</span>
-        </Button>
       </div>
 
       {/* Global Standing Section */}

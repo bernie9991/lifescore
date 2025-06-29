@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Target, 
@@ -42,7 +42,8 @@ import {
   Moon,
   Sun,
   Smartphone,
-  Headphones
+  Headphones,
+  Save
 } from 'lucide-react';
 import { User } from '../../types';
 import { formatNumber, triggerConfetti, triggerAchievementConfetti } from '../../utils/animations';
@@ -79,6 +80,10 @@ interface Habit {
   completedToday: boolean;
   lastCompleted?: Date;
   isPaused?: boolean;
+  selectedAt?: Date;
+  totalCompletions?: number;
+  weeklyProgress?: number[];
+  successRate?: number;
 }
 
 interface AvailableHabit {
@@ -118,6 +123,7 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [knowledgePaths, setKnowledgePaths] = useState<KnowledgePath[]>([]);
+  const [selectedHabits, setSelectedHabits] = useState<Set<string>>(new Set());
 
   const [availableHabits] = useState<AvailableHabit[]>([
     // Mind habits
@@ -160,10 +166,42 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
     { id: 'knowledge', label: 'Knowledge Paths', icon: BookOpen }
   ];
 
+  // Load user habits from localStorage on component mount
+  useEffect(() => {
+    const savedHabits = localStorage.getItem(`user_habits_${user.id}`);
+    if (savedHabits) {
+      try {
+        const parsedHabits = JSON.parse(savedHabits);
+        setHabits(parsedHabits);
+      } catch (error) {
+        console.error('Error loading saved habits:', error);
+      }
+    }
+  }, [user.id]);
+
+  // Save habits to localStorage whenever habits change
+  useEffect(() => {
+    if (habits.length > 0) {
+      localStorage.setItem(`user_habits_${user.id}`, JSON.stringify(habits));
+    }
+  }, [habits, user.id]);
+
   const handleCompleteHabit = (habitId: string) => {
     setHabits(prev => prev.map(habit => {
       if (habit.id === habitId && !habit.completedToday && !habit.isPaused) {
         const newStreak = habit.streak + 1;
+        const newTotalCompletions = (habit.totalCompletions || 0) + 1;
+        
+        // Calculate success rate
+        const daysSinceSelected = habit.selectedAt 
+          ? Math.ceil((Date.now() - habit.selectedAt.getTime()) / (1000 * 60 * 60 * 24))
+          : 1;
+        const successRate = Math.round((newTotalCompletions / daysSinceSelected) * 100);
+        
+        // Update weekly progress (last 7 days)
+        const today = new Date().getDay();
+        const newWeeklyProgress = habit.weeklyProgress || new Array(7).fill(0);
+        newWeeklyProgress[today] = 1;
         
         // Check for streak milestones
         if (newStreak === 7) {
@@ -181,34 +219,49 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
           ...habit,
           completedToday: true,
           streak: newStreak,
-          lastCompleted: new Date()
+          lastCompleted: new Date(),
+          totalCompletions: newTotalCompletions,
+          successRate,
+          weeklyProgress: newWeeklyProgress
         };
       }
       return habit;
     }));
   };
 
-  const handleAddHabit = (availableHabit: AvailableHabit) => {
-    // Check if habit already exists
-    const existingHabit = habits.find(h => h.name === availableHabit.name);
-    if (existingHabit) {
-      toast.error('This habit is already in your list!');
-      return;
-    }
+  const handleToggleHabitSelection = (habitId: string) => {
+    setSelectedHabits(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(habitId)) {
+        newSet.delete(habitId);
+      } else {
+        newSet.add(habitId);
+      }
+      return newSet;
+    });
+  };
 
-    const newHabit: Habit = {
-      id: `habit-${Date.now()}`,
-      name: availableHabit.name,
-      emoji: availableHabit.emoji,
-      category: availableHabit.category,
+  const handleSaveSelectedHabits = () => {
+    const selectedHabitData = availableHabits.filter(habit => selectedHabits.has(habit.id));
+    const newHabits: Habit[] = selectedHabitData.map(habit => ({
+      id: `habit-${Date.now()}-${Math.random()}`,
+      name: habit.name,
+      emoji: habit.emoji,
+      category: habit.category,
       streak: 0,
-      completedToday: false
-    };
+      completedToday: false,
+      selectedAt: new Date(),
+      totalCompletions: 0,
+      weeklyProgress: new Array(7).fill(0),
+      successRate: 0
+    }));
 
-    setHabits(prev => [...prev, newHabit]);
+    setHabits(prev => [...prev, ...newHabits]);
+    setSelectedHabits(new Set());
     setShowAddHabitModal(false);
+    
     triggerConfetti();
-    toast.success(`${availableHabit.name} added to your habits! 🎯`);
+    toast.success(`${newHabits.length} habit${newHabits.length > 1 ? 's' : ''} added! 🎯`);
   };
 
   const handleRemoveHabit = (habitId: string) => {
@@ -311,136 +364,180 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
           </div>
 
           {habits.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
-              {habits.map((habit, index) => {
-                const CategoryIcon = getHabitCategoryIcon(habit.category);
-                const categoryColor = getHabitCategoryColor(habit.category);
-                const progressPercentage = habit.completedToday ? 100 : 0;
-                
-                return (
-                  <motion.div
-                    key={habit.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <Card className={`p-3 md:p-4 ${
-                      habit.isPaused ? 'border-gray-500/40 bg-gray-500/10 opacity-60' :
-                      habit.completedToday ? 'border-green-400/40 bg-green-500/10' : 'border-gray-600'
-                    } hover:shadow-lg transition-all cursor-pointer relative group`}
-                          onClick={() => !habit.completedToday && !habit.isPaused && handleCompleteHabit(habit.id)}>
-                      
-                      {/* Action Buttons */}
-                      <div className="absolute top-1 right-1 flex space-x-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePauseHabit(habit.id);
-                          }}
-                          className="p-1 bg-gray-700 hover:bg-gray-600 rounded text-white"
-                          title={habit.isPaused ? 'Resume' : 'Pause'}
-                        >
-                          <Pause className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveHabit(habit.id);
-                          }}
-                          className="p-1 bg-red-600 hover:bg-red-700 rounded text-white"
-                          title="Remove"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-
-                      <div className="text-center">
-                        {/* Habit Ring Progress */}
-                        <div className="relative w-12 h-12 md:w-16 md:h-16 mx-auto mb-2 md:mb-3">
-                          <svg className="w-12 h-12 md:w-16 md:h-16 transform -rotate-90" viewBox="0 0 100 100">
-                            <circle
-                              cx="50"
-                              cy="50"
-                              r="35"
-                              stroke="currentColor"
-                              strokeWidth="8"
-                              fill="transparent"
-                              className="text-gray-700"
-                            />
-                            <circle
-                              cx="50"
-                              cy="50"
-                              r="35"
-                              stroke="currentColor"
-                              strokeWidth="8"
-                              fill="transparent"
-                              strokeDasharray={`${2 * Math.PI * 35}`}
-                              strokeDashoffset={`${2 * Math.PI * 35 * (1 - progressPercentage / 100)}`}
-                              className={habit.completedToday ? 'text-green-400' : 'text-blue-400'}
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-lg md:text-2xl">{habit.emoji}</span>
-                          </div>
-                          {habit.completedToday && (
-                            <div className="absolute -top-1 -right-1 bg-green-500 rounded-full p-1">
-                              <CheckCircle className="w-2 h-2 md:w-3 md:h-3 text-white" />
-                            </div>
-                          )}
-                          {habit.isPaused && (
-                            <div className="absolute -top-1 -right-1 bg-gray-500 rounded-full p-1">
-                              <Pause className="w-2 h-2 md:w-3 md:h-3 text-white" />
-                            </div>
-                          )}
-                        </div>
-
-                        <h3 className="font-bold text-white text-xs md:text-sm mb-1 md:mb-2 line-clamp-2">{habit.name}</h3>
+            <>
+              {/* Habits Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+                {habits.map((habit, index) => {
+                  const CategoryIcon = getHabitCategoryIcon(habit.category);
+                  const categoryColor = getHabitCategoryColor(habit.category);
+                  const progressPercentage = habit.completedToday ? 100 : 0;
+                  
+                  return (
+                    <motion.div
+                      key={habit.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: index * 0.1 }}
+                    >
+                      <Card className={`p-3 md:p-4 ${
+                        habit.isPaused ? 'border-gray-500/40 bg-gray-500/10 opacity-60' :
+                        habit.completedToday ? 'border-green-400/40 bg-green-500/10' : 'border-gray-600'
+                      } hover:shadow-lg transition-all cursor-pointer relative group`}
+                            onClick={() => !habit.completedToday && !habit.isPaused && handleCompleteHabit(habit.id)}>
                         
-                        <div className={`inline-flex items-center px-1 md:px-2 py-0.5 md:py-1 rounded-full text-xs font-semibold ${categoryColor} mb-1 md:mb-2`}>
-                          <CategoryIcon className="w-2 h-2 md:w-3 md:h-3 mr-1" />
-                          <span className="hidden md:inline">{habit.category}</span>
-                          <span className="md:hidden">{habit.category.charAt(0).toUpperCase()}</span>
-                        </div>
-
-                        <div className="flex items-center justify-center space-x-1 mb-2 md:mb-3">
-                          <Flame className="w-3 h-3 md:w-4 md:h-4 text-orange-400" />
-                          <span className="text-sm md:text-lg font-bold text-orange-400">{habit.streak}</span>
-                          <span className="text-gray-400 text-xs hidden md:inline">days</span>
-                        </div>
-
-                        {!habit.completedToday && !habit.isPaused && (
-                          <Button
-                            size="sm"
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-xs py-1"
-                            icon={CheckCircle}
+                        {/* Action Buttons */}
+                        <div className="absolute top-1 right-1 flex space-x-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleCompleteHabit(habit.id);
+                              handlePauseHabit(habit.id);
                             }}
+                            className="p-1 bg-gray-700 hover:bg-gray-600 rounded text-white"
+                            title={habit.isPaused ? 'Resume' : 'Pause'}
                           >
-                            <span className="hidden md:inline">Complete</span>
-                            <span className="md:hidden">✓</span>
-                          </Button>
-                        )}
+                            <Pause className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveHabit(habit.id);
+                            }}
+                            className="p-1 bg-red-600 hover:bg-red-700 rounded text-white"
+                            title="Remove"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
 
-                        {habit.completedToday && (
-                          <div className="text-green-400 font-semibold text-xs">
-                            ✅ <span className="hidden md:inline">Done!</span>
+                        <div className="text-center">
+                          {/* Habit Ring Progress */}
+                          <div className="relative w-12 h-12 md:w-16 md:h-16 mx-auto mb-2 md:mb-3">
+                            <svg className="w-12 h-12 md:w-16 md:h-16 transform -rotate-90" viewBox="0 0 100 100">
+                              <circle
+                                cx="50"
+                                cy="50"
+                                r="35"
+                                stroke="currentColor"
+                                strokeWidth="8"
+                                fill="transparent"
+                                className="text-gray-700"
+                              />
+                              <circle
+                                cx="50"
+                                cy="50"
+                                r="35"
+                                stroke="currentColor"
+                                strokeWidth="8"
+                                fill="transparent"
+                                strokeDasharray={`${2 * Math.PI * 35}`}
+                                strokeDashoffset={`${2 * Math.PI * 35 * (1 - progressPercentage / 100)}`}
+                                className={habit.completedToday ? 'text-green-400' : 'text-blue-400'}
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="text-lg md:text-2xl">{habit.emoji}</span>
+                            </div>
+                            {habit.completedToday && (
+                              <div className="absolute -top-1 -right-1 bg-green-500 rounded-full p-1">
+                                <CheckCircle className="w-2 h-2 md:w-3 md:h-3 text-white" />
+                              </div>
+                            )}
+                            {habit.isPaused && (
+                              <div className="absolute -top-1 -right-1 bg-gray-500 rounded-full p-1">
+                                <Pause className="w-2 h-2 md:w-3 md:h-3 text-white" />
+                              </div>
+                            )}
                           </div>
-                        )}
 
-                        {habit.isPaused && (
-                          <div className="text-gray-400 font-semibold text-xs">
-                            ⏸️ <span className="hidden md:inline">Paused</span>
+                          <h3 className="font-bold text-white text-xs md:text-sm mb-1 md:mb-2 line-clamp-2">{habit.name}</h3>
+                          
+                          <div className={`inline-flex items-center px-1 md:px-2 py-0.5 md:py-1 rounded-full text-xs font-semibold ${categoryColor} mb-1 md:mb-2`}>
+                            <CategoryIcon className="w-2 h-2 md:w-3 md:h-3 mr-1" />
+                            <span className="hidden md:inline">{habit.category}</span>
+                            <span className="md:hidden">{habit.category.charAt(0).toUpperCase()}</span>
                           </div>
-                        )}
-                      </div>
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </div>
+
+                          <div className="flex items-center justify-center space-x-1 mb-2 md:mb-3">
+                            <Flame className="w-3 h-3 md:w-4 md:h-4 text-orange-400" />
+                            <span className="text-sm md:text-lg font-bold text-orange-400">{habit.streak}</span>
+                            <span className="text-gray-400 text-xs hidden md:inline">days</span>
+                          </div>
+
+                          {/* Success Rate */}
+                          {habit.successRate !== undefined && (
+                            <div className="text-xs text-gray-400 mb-2">
+                              {habit.successRate}% success
+                            </div>
+                          )}
+
+                          {!habit.completedToday && !habit.isPaused && (
+                            <Button
+                              size="sm"
+                              className="w-full bg-blue-600 hover:bg-blue-700 text-xs py-1"
+                              icon={CheckCircle}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCompleteHabit(habit.id);
+                              }}
+                            >
+                              <span className="hidden md:inline">Complete</span>
+                              <span className="md:hidden">✓</span>
+                            </Button>
+                          )}
+
+                          {habit.completedToday && (
+                            <div className="text-green-400 font-semibold text-xs">
+                              ✅ <span className="hidden md:inline">Done!</span>
+                            </div>
+                          )}
+
+                          {habit.isPaused && (
+                            <div className="text-gray-400 font-semibold text-xs">
+                              ⏸️ <span className="hidden md:inline">Paused</span>
+                            </div>
+                          )}
+                        </div>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* Progress Summary */}
+              <Card className="p-4 bg-gradient-to-r from-blue-900/20 to-purple-900/20 border-blue-500/30">
+                <h3 className="text-lg font-bold text-white mb-3 flex items-center">
+                  <BarChart3 className="w-5 h-5 text-blue-400 mr-2" />
+                  Progress Summary
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-400">
+                      {habits.filter(h => h.completedToday).length}
+                    </div>
+                    <div className="text-sm text-gray-400">Completed Today</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-400">
+                      {Math.max(...habits.map(h => h.streak), 0)}
+                    </div>
+                    <div className="text-sm text-gray-400">Best Streak</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-400">
+                      {habits.reduce((sum, h) => sum + (h.totalCompletions || 0), 0)}
+                    </div>
+                    <div className="text-sm text-gray-400">Total Completions</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-400">
+                      {habits.length > 0 ? Math.round(habits.reduce((sum, h) => sum + (h.successRate || 0), 0) / habits.length) : 0}%
+                    </div>
+                    <div className="text-sm text-gray-400">Avg Success Rate</div>
+                  </div>
+                </div>
+              </Card>
+            </>
           ) : (
             /* Empty Habits State */
             <Card className="p-8 text-center bg-gradient-to-br from-gray-800/50 to-gray-900/50">
@@ -570,7 +667,7 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
         </div>
       )}
 
-      {/* Add Habit Modal */}
+      {/* Enhanced Add Habit Modal */}
       <AnimatePresence>
         {showAddHabitModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -592,7 +689,7 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
             >
               {/* Header */}
               <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-700">
-                <h2 className="text-xl md:text-2xl font-bold text-white">Choose a Habit</h2>
+                <h2 className="text-xl md:text-2xl font-bold text-white">Choose Your Habits</h2>
                 <button
                   onClick={() => setShowAddHabitModal(false)}
                   className="text-gray-400 hover:text-white transition-colors"
@@ -602,7 +699,7 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
               </div>
 
               {/* Content - Scrollable */}
-              <div className="p-4 md:p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <div className="p-4 md:p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-200px)]">
                 {Object.entries(groupedAvailableHabits).map(([category, categoryHabits]) => {
                   const CategoryIcon = getHabitCategoryIcon(category as Habit['category']);
                   const categoryColor = getHabitCategoryColor(category as Habit['category']);
@@ -615,31 +712,75 @@ const QuestsAndMissions: React.FC<QuestsAndMissionsProps> = ({ user }) => {
                       </h3>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {categoryHabits.map((habit) => (
-                          <motion.div
-                            key={habit.id}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            <Card 
-                              className="p-4 border border-gray-600 hover:border-blue-500/50 transition-all cursor-pointer"
-                              onClick={() => handleAddHabit(habit)}
+                        {categoryHabits.map((habit) => {
+                          const isSelected = selectedHabits.has(habit.id);
+                          const isAlreadyAdded = habits.some(h => h.name === habit.name);
+                          
+                          return (
+                            <motion.div
+                              key={habit.id}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
                             >
-                              <div className="flex items-center space-x-3">
-                                <div className="text-2xl">{habit.emoji}</div>
-                                <div className="flex-1">
-                                  <h4 className="font-semibold text-white">{habit.name}</h4>
-                                  <p className="text-gray-400 text-sm">{habit.description}</p>
+                              <Card 
+                                className={`p-4 border transition-all cursor-pointer ${
+                                  isAlreadyAdded 
+                                    ? 'border-gray-500 bg-gray-700/50 opacity-50 cursor-not-allowed'
+                                    : isSelected
+                                    ? 'border-blue-500 bg-blue-500/20'
+                                    : 'border-gray-600 hover:border-blue-500/50'
+                                }`}
+                                onClick={() => !isAlreadyAdded && handleToggleHabitSelection(habit.id)}
+                              >
+                                <div className="flex items-center space-x-3">
+                                  <div className="text-2xl">{habit.emoji}</div>
+                                  <div className="flex-1">
+                                    <h4 className="font-semibold text-white">{habit.name}</h4>
+                                    <p className="text-gray-400 text-sm">{habit.description}</p>
+                                  </div>
+                                  <div className="flex-shrink-0">
+                                    {isAlreadyAdded ? (
+                                      <CheckCircle className="w-5 h-5 text-green-400" />
+                                    ) : isSelected ? (
+                                      <CheckCircle className="w-5 h-5 text-blue-400" />
+                                    ) : (
+                                      <div className="w-5 h-5 border-2 border-gray-400 rounded-full" />
+                                    )}
+                                  </div>
                                 </div>
-                                <Plus className="w-5 h-5 text-blue-400" />
-                              </div>
-                            </Card>
-                          </motion.div>
-                        ))}
+                              </Card>
+                            </motion.div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 md:p-6 border-t border-gray-700 bg-gray-900/50">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-400">
+                    {selectedHabits.size} habit{selectedHabits.size !== 1 ? 's' : ''} selected
+                  </div>
+                  <div className="flex space-x-3">
+                    <Button
+                      variant="secondary"
+                      onClick={() => setShowAddHabitModal(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleSaveSelectedHabits}
+                      disabled={selectedHabits.size === 0}
+                      icon={Save}
+                      className="bg-gradient-to-r from-blue-500 to-purple-600"
+                    >
+                      Save Selection ({selectedHabits.size})
+                    </Button>
+                  </div>
+                </div>
               </div>
             </motion.div>
           </div>
