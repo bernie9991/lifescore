@@ -1,25 +1,23 @@
-import * as Purchases from '@revenuecat/purchases-js';
+// src/lib/revenuecat.ts
 
-// RevenueCat API key
-const REVENUECAT_API_KEY = "rcb_NuecjNKbQSeWwmTaHcWCBZKpGyvS";
+import Purchases from '@revenuecat/purchases-js';
 
+const API_KEY = "rcb_NuecjNKbQSeWwmTaHcWCBZKpGyvS";
+
+// Check if the key is a placeholder
+if (API_KEY.startsWith("REPLACE")) {
+  console.error("RevenueCat API key is not set. Please update it in src/lib/revenuecat.ts");
+}
+
+// Create a single instance of the Purchases class.
+// The configuration (API key) happens here in the constructor.
+const purchases = new Purchases(API_KEY);
+
+// A separate function to call for additional setup, like debug logs.
 export const initializeRevenueCat = () => {
-  if (!REVENUECAT_API_KEY) {
-    console.error("RevenueCat API key is not set. Please update it in src/lib/revenuecat.ts");
-    throw new Error("RevenueCat API key is not set. Please update it in src/lib/revenuecat.ts");
-  }
-  
-  try {
-    console.log("Initializing RevenueCat with API key:", REVENUECAT_API_KEY);
-    Purchases.configure({
-      apiKey: REVENUECAT_API_KEY,
-      debugLogsEnabled: true
-    });
-    console.log("RevenueCat initialized successfully");
-  } catch (error) {
-    console.error("Failed to initialize RevenueCat:", error);
-    throw error;
-  }
+    // Call the method on the INSTANCE, not the class
+    purchases.setDebugLogsEnabled(true);
 };
 
-export default Purchases;
+// Export the INSTANCE for the rest of the app to use
+export default purchases;
