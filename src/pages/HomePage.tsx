@@ -37,10 +37,10 @@ const HomePage: React.FC = () => {
               transition={{ delay: 0.4 }}
               className="text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight"
             >
-              Where Do You Stand
+              Your Life is Your
               <br />
               <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                in the World?
+                Adventure
               </span>
             </motion.h2>
 
@@ -50,9 +50,9 @@ const HomePage: React.FC = () => {
               transition={{ delay: 0.6 }}
               className="text-xl text-gray-300 mb-8 max-w-2xl"
             >
-              See how your money, knowledge, and possessions rank globally. 
-              Compete with friends, climb leaderboards, and unlock achievements 
-              based on your real-life stats.
+              Turn personal growth into a great journey. Set goals, complete real-world quests, 
+              and build the stats of a healthier, more balanced life. It's not just a to-do list; 
+              it's a role-playing game where you are the hero.
             </motion.p>
 
             <motion.div
